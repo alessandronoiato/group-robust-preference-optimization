@@ -1,6 +1,6 @@
 import numpy as np
 import copy
-from typing import List
+from typing import List, Tuple
 from envs.linear_bandit import LinearBandit
 from utils.collect_data import Transition, ret_uniform_policy
 from utils.utils import softmax
@@ -77,7 +77,7 @@ class PolicyGradient:
 
         return policy
 
-    def update_once(self, dataset: List[np.ndarray]) -> List[float, float]:
+    def update_once(self, dataset: List[np.ndarray]) -> Tuple[float]:
         grad = np.zeros_like(self.policy_param, np.float32)
         for state in dataset:
             rews = [

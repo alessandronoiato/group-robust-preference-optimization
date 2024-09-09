@@ -196,7 +196,7 @@ def main(args):
             exp_name=args.wandb_name +"_"+args.dpo_type + "_" + str(args.rdpo_exp_step_size) +"_" + str(args.rdpo_batch_size) + '_' + str(args.rdpo_weighted_batches) + "_" + args.rdpo_adj  + "_" + str(args.seed)
         wandb.init(
             group=f'state_dim{args.state_dim}'+f'action_num{args.action_num}'+f'group_num{args.group_num}'+f'pref_data_num{args.pref_data_num}'+f'weights{args.weights}'+f'feature_type{args.feature_type}'+f'eval_metric{args.eval_metric}'+f'_{args.wandb_group}',
-            entity=args.wandb_entity,
+            # entity=args.wandb_entity,
             project=args.wandb_project,
             config=args.__dict__,
             dir=log_dir,

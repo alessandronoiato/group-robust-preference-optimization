@@ -1,7 +1,7 @@
 import cvxpy as cp
 import numpy as np
 from envs.linear_bandit import LinearBandit
-from typing import List
+from typing import List, Sequence, Tuple
 from utils.collect_data import (
     Transition,
     sigmoid,
@@ -181,7 +181,7 @@ class MLERewardLearning:
 
     def evaluate(
         self, dataset: List[Transition], true_reward_param: np.ndarray
-    ) -> List[float, float, float]:
+    ) -> Tuple[float]:
         # calculate the loss
         loss = 0.0
         acc = 0.0
@@ -215,7 +215,7 @@ class MLERewardLearning:
     
     def evaluate_group(
         self, dataset: List[Transition], true_reward_param: np.ndarray
-    ) -> List[float, float, float]:
+    ) -> Tuple[float]:
         # calculate the loss
         loss = 0.0
         acc = 0.0
