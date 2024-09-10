@@ -1,6 +1,8 @@
-import numpy as np
 import copy
 from typing import List, Tuple
+
+import numpy as np
+
 from envs.linear_bandit import LinearBandit
 from utils.collect_data import Transition, ret_uniform_policy
 from utils.utils import softmax
@@ -47,10 +49,7 @@ class PolicyGradient:
         Calculate the action probability at the input state.
         """
         action_prob = np.array(
-            [
-                np.dot(self.policy_param, self.feature_func(state, action_idx))
-                for action_idx in range(self.action_num)
-            ],
+            [np.dot(self.policy_param, self.feature_func(state, action_idx)) for action_idx in range(self.action_num)],
             dtype=np.float32,
         )
         action_prob = np.exp(action_prob)
@@ -80,10 +79,7 @@ class PolicyGradient:
     def update_once(self, dataset: List[np.ndarray]) -> Tuple[float]:
         grad = np.zeros_like(self.policy_param, np.float32)
         for state in dataset:
-            rews = [
-                self.reward_func(state, action_idx)
-                for action_idx in range(self.action_num)
-            ]
+            rews = [self.reward_func(state, action_idx) for action_idx in range(self.action_num)]
             rews = np.array(rews, np.float32)
             cur_policy_action_prob = self.ret_action_prob(state)
             ref_policy_action_prob = self.ref_policy(state)
@@ -115,17 +111,12 @@ class PolicyGradient:
         """
         score_list = []
         feature_mat = np.stack(
-            [
-                self.feature_func(state, action_idx)
-                for action_idx in range(self.action_num)
-            ],
+            [self.feature_func(state, action_idx) for action_idx in range(self.action_num)],
             axis=0,
         )
         act_prob = self.ret_action_prob(state)
         avg_feature = np.matmul(feature_mat.T, act_prob)
-        assert avg_feature.shape == (
-            self.feature_dim,
-        ), "The average feature is invalid."
+        assert avg_feature.shape == (self.feature_dim,), "The average feature is invalid."
         for action_idx in range(self.action_num):
             score_list.append(self.feature_func(state, action_idx) - avg_feature)
 
@@ -137,10 +128,7 @@ class PolicyGradient:
     def evaluate_loss(self, dataset: List[np.ndarray]) -> float:
         loss = 0.0
         for state in dataset:
-            rews = [
-                self.reward_func(state, action_idx)
-                for action_idx in range(self.action_num)
-            ]
+            rews = [self.reward_func(state, action_idx) for action_idx in range(self.action_num)]
             rews = np.array(rews, np.float32)
             cur_act_prob = self.ret_action_prob(state)
             avg_rew = np.dot(rews, cur_act_prob)

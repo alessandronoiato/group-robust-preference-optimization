@@ -1,11 +1,13 @@
 import copy
+from typing import List
+
 import cvxpy as cp
 import numpy as np
-from typing import List
+
 from envs.linear_bandit import LinearBandit
-from utils.collect_data import Transition, ret_uniform_policy, collect_preference_data
-from utils.utils import softmax, sigmoid
+from utils.collect_data import Transition, collect_preference_data, ret_uniform_policy
 from utils.logger import Logger
+from utils.utils import sigmoid, softmax
 
 
 class DirectPolicyOptimization:
@@ -94,9 +96,7 @@ class DirectPolicyOptimization:
                 + np.log(ref_policy_act_prob[non_pref_act] + 1e-6)
             )
             coef = sigmoid(-log_ratio_diff)
-            neg_cur_data_grad = (
-                self.reg_coef * coef * (feat_pref_act - feat_non_pref_act)
-            )
+            neg_cur_data_grad = self.reg_coef * coef * (feat_pref_act - feat_non_pref_act)
             grad -= neg_cur_data_grad
 
         grad /= len(dataset)

@@ -1,13 +1,10 @@
+from typing import List, Sequence, Tuple
+
 import cvxpy as cp
 import numpy as np
+
 from envs.linear_bandit import LinearBandit
-from typing import List, Sequence, Tuple
-from utils.collect_data import (
-    Transition,
-    sigmoid,
-    collect_preference_data,
-    ret_uniform_policy,
-)
+from utils.collect_data import Transition, collect_preference_data, ret_uniform_policy, sigmoid
 
 
 class MLERewardLearning:
@@ -70,9 +67,7 @@ class MLERewardLearning:
                 np.dot(feature_non_pref_act, self.reward_param),
             )
             diff += rew_pref_act - rew_non_pref_act
-            grad -= sigmoid(rew_non_pref_act - rew_pref_act) * (
-                feature_pref_act - feature_non_pref_act
-            )
+            grad -= sigmoid(rew_non_pref_act - rew_pref_act) * (feature_pref_act - feature_non_pref_act)
 
         grad = grad / len(dataset)
         grad_norm = np.sqrt(np.sum(np.square(grad)))
@@ -136,7 +131,6 @@ class MLERewardLearning:
         # l2_dist = np.sqrt(np.sum(np.square(true_reward_param - psi_arr)))
 
         return loss, l2_dist, acc
-    
 
     def train_by_cvxpy_group(self, dataset: List[Transition], true_reward_param: np.ndarray):
         psi = cp.Variable(self.param_dim)
@@ -178,10 +172,7 @@ class MLERewardLearning:
 
         return loss, l2_dist, acc
 
-
-    def evaluate(
-        self, dataset: List[Transition], true_reward_param: np.ndarray
-    ) -> Tuple[float]:
+    def evaluate(self, dataset: List[Transition], true_reward_param: np.ndarray) -> Tuple[float]:
         # calculate the loss
         loss = 0.0
         acc = 0.0
@@ -212,10 +203,8 @@ class MLERewardLearning:
         l2_dist = np.sqrt(np.sum(np.square(true_reward_param - self.reward_param)))
 
         return loss, l2_dist, acc
-    
-    def evaluate_group(
-        self, dataset: List[Transition], true_reward_param: np.ndarray
-    ) -> Tuple[float]:
+
+    def evaluate_group(self, dataset: List[Transition], true_reward_param: np.ndarray) -> Tuple[float]:
         # calculate the loss
         loss = 0.0
         acc = 0.0
@@ -223,7 +212,7 @@ class MLERewardLearning:
             state = transition.state
             action_one = transition.action_0
             action_two = transition.action_1
-            group_id=transition.group_id
+            group_id = transition.group_id
             pref = transition.pref
             pref_act = action_two if pref == 1 else action_one
             non_pref_act = action_two if pref == 0 else action_one

@@ -1,13 +1,12 @@
 import argparse
 import ast
-import os
 import copy
+import os
+
 import numpy as np
 import yaml
 
-from algos.linear_bandit.group_dpo_vectorised import (
-    GroupDirectPolicyOptimizationVectorised as GDPO,
-)
+from algos.linear_bandit.group_dpo_vectorised import GroupDirectPolicyOptimizationVectorised as GDPO
 from algos.linear_bandit.group_robust_dpo_vectorised_gradfix import (
     GroupRobustDirectPolicyOptimizationVectorised as GRDPO,
 )
@@ -40,9 +39,7 @@ def float_list(arg):
     except (ValueError, SyntaxError) as e:
         print("ERROR: ", arg)
         print(e)
-        raise argparse.ArgumentTypeError(
-            "Invalid list format or elements are not floats"
-        )
+        raise argparse.ArgumentTypeError("Invalid list format or elements are not floats")
 
 
 def set_reward_params(feature_dim: int):
@@ -96,9 +93,7 @@ def parse_args():
         default="[0,0]",
     )
 
-    parser.add_argument(
-        "--val_deterministic", type=lambda x: (str(x).lower() == "true"), default=False
-    )
+    parser.add_argument("--val_deterministic", type=lambda x: (str(x).lower() == "true"), default=False)
     parser.add_argument(
         "--val_deterministic_ratio_list",
         type=float_list,
@@ -144,28 +139,16 @@ def parse_args():
     parser.add_argument("--importance_sampling_weights", type=str, default="None")
     parser.add_argument("--ipo_grad_type", type=str, default="justdpo")
     parser.add_argument("--param_limit", type=int, default=1)
-    parser.add_argument(
-        "--use_closed_form", type=lambda x: (str(x).lower() == "true"), default=False
-    )
+    parser.add_argument("--use_closed_form", type=lambda x: (str(x).lower() == "true"), default=False)
     parser.add_argument("--lamba", type=float, default=0)
     parser.add_argument("--l2_reg_rdpo", type=float, default=0)
-    parser.add_argument(
-        "--use_weight_val", type=lambda x: (str(x).lower() == "true"), default=False
-    )
-    parser.add_argument(
-        "--use_uneven_grp", type=lambda x: (str(x).lower() == "true"), default=False
-    )
-    parser.add_argument(
-        "--use_uneven_grp_val", type=lambda x: (str(x).lower() == "true"), default=False
-    )
-    parser.add_argument(
-        "--use_theory", type=lambda x: (str(x).lower() == "true"), default=False
-    )
+    parser.add_argument("--use_weight_val", type=lambda x: (str(x).lower() == "true"), default=False)
+    parser.add_argument("--use_uneven_grp", type=lambda x: (str(x).lower() == "true"), default=False)
+    parser.add_argument("--use_uneven_grp_val", type=lambda x: (str(x).lower() == "true"), default=False)
+    parser.add_argument("--use_theory", type=lambda x: (str(x).lower() == "true"), default=False)
 
     parser.add_argument("--wandb_use", action="store_true")
-    parser.add_argument(
-        "--wandb_key", type=str, default="cd7b1433bad4eb38b457b881d01b17040a0b2432"
-    )
+    parser.add_argument("--wandb_key", type=str, default="cd7b1433bad4eb38b457b881d01b17040a0b2432")
     parser.add_argument("--wandb_entity", type=str, default="robust-rl-project")
     parser.add_argument("--wandb_project", type=str, default="bandits_dpo")
     parser.add_argument("--wandb_group", type=str, default="group1")
@@ -307,9 +290,7 @@ def main(args):
 
     formatted_opt_reward = ", ".join([f"{reward:.4f}" for reward in opt_reward])
     formatted_uni_reward = ", ".join([f"{reward:.4f}" for reward in uni_reward])
-    logger.info(
-        f"optimal policy reward: {formatted_opt_reward}, uniform policy reward: {uni_reward}."
-    )
+    logger.info(f"optimal policy reward: {formatted_opt_reward}, uniform policy reward: {uni_reward}.")
 
     # learn the reward function
     reward_model = MLERewardLearning(
@@ -320,9 +301,7 @@ def main(args):
         args.mle_adaptive,
         args.mle_ada_coef,
     )
-    loss, l2_dist, acc = reward_model.train_by_cvxpy_group(
-        dataset=pref_data, true_reward_param=reward_param
-    )
+    loss, l2_dist, acc = reward_model.train_by_cvxpy_group(dataset=pref_data, true_reward_param=reward_param)
     logger.info(f"Reward loss: {loss:.4f}, l2 distance: {l2_dist:.4f}, acc: {acc:.2f}.")
 
     learned_reward_param = reward_model.get_reward_param
@@ -339,13 +318,9 @@ def main(args):
         num_trials_for_eval=num_trials_for_eval,
     )
     learned_oracle_opt_policy = learned_env.get_opt_policy()
-    learned_oracle_opt_reward = env.evaluate_reward_group_wise(
-        policy=learned_oracle_opt_policy, states=test_pref
-    )
+    learned_oracle_opt_reward = env.evaluate_reward_group_wise(policy=learned_oracle_opt_policy, states=test_pref)
 
-    formatted_learned_oracle_opt_reward = ", ".join(
-        [f"{reward:.4f}" for reward in learned_oracle_opt_reward]
-    )
+    formatted_learned_oracle_opt_reward = ", ".join([f"{reward:.4f}" for reward in learned_oracle_opt_reward])
     logger.info(f"Learned oracle reward: {formatted_learned_oracle_opt_reward}")
 
     # Train the RL on the preference data
@@ -462,9 +437,7 @@ def main(args):
     rew_error = [float((a - b) / a) for a, b in zip(opt_reward, reward)]
     formatted_rew_error = ", ".join([f"{reward:.4f}" for reward in rew_error])
     policy_param = agent.get_param
-    logger.info(
-        f"Policy parameter learned solely on the preference data {args.dpo_type}: {policy_param}."
-    )
+    logger.info(f"Policy parameter learned solely on the preference data {args.dpo_type}: {policy_param}.")
     logger.info(
         f"Training solely on the preference data {args.dpo_type}, dataset size: {len(pref_data): d}, optimal reward: {formatted_opt_reward}, reward: {formatted_reward}, reward error: {formatted_rew_error}."
     )

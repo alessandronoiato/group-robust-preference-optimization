@@ -26,9 +26,7 @@ class LinearBandit:
     def sample(self, action) -> float:
         assert action in self.action_space, "The input action is invalid."
         feature = self.feature_func(self.cur_state, action)
-        assert np.shape(feature) == np.shape(
-            self.reward_param
-        ), "The feature is invalid."
+        assert np.shape(feature) == np.shape(self.reward_param), "The feature is invalid."
         rew = np.dot(feature, self.reward_param)
         return rew
 
@@ -36,10 +34,7 @@ class LinearBandit:
         def opt_policy(state: np.ndarray):
             # compute the optimal policy by enumerating the action space
             feature_mat = np.array(
-                [
-                    self.feature_func(state, action_idx)
-                    for action_idx in range(self.action_num)
-                ],
+                [self.feature_func(state, action_idx) for action_idx in range(self.action_num)],
                 dtype=np.float32,
             )
             assert np.shape(feature_mat) == (
@@ -60,23 +55,16 @@ class LinearBandit:
         apply MC method to approximate the reward
         """
         rew = 0
-        state_mat = np.random.uniform(
-            0, 1, size=(self.num_trials_for_eval, self.state_dim)
-        )
+        state_mat = np.random.uniform(0, 1, size=(self.num_trials_for_eval, self.state_dim))
         feature_tensor = []
         action_mat = []
         for index in range(self.num_trials_for_eval):
             state = state_mat[index, :]
             action_prob = policy(state)
-            assert np.all(action_prob >= 0.0) and np.allclose(
-                np.sum(action_prob), 1.0
-            ), "The policy is invalid."
+            assert np.all(action_prob >= 0.0) and np.allclose(np.sum(action_prob), 1.0), "The policy is invalid."
 
             action_mat.append(action_prob)
-            feature_mat = [
-                self.feature_func(state, act_index)
-                for act_index in range(self.action_num)
-            ]
+            feature_mat = [self.feature_func(state, act_index) for act_index in range(self.action_num)]
             feature_mat = np.stack(feature_mat, axis=0)
             feature_tensor.append(feature_mat)
 

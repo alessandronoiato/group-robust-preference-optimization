@@ -1,10 +1,11 @@
+import math
 import os
 import shutil
-import yaml
-import time
-import math
 import socket
+import time
+
 import numpy as np
+import yaml
 
 PROJECT_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -46,24 +47,21 @@ def _convert_config(config):
 
 def create_log_dir(args):
     # env_name = args.env.replace("/", "_")
-    #run_id = "{}-{}-{}".format(
+    # run_id = "{}-{}-{}".format(
     #    args.agent, args.seed, time.strftime("%Y-%m-%d-%H-%M-%S")
-    #)
-    run_id = "{}-{}-{}".format(
-       args.agent, args.seed, args.weights
-    )
+    # )
+    run_id = "{}-{}-{}".format(args.agent, args.seed, args.weights)
     log_dir = os.path.join(args.logdir, args.agent, run_id)
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
+
 def create_log_dir_lb(args):
     # env_name = args.env.replace("/", "_")
-    #run_id = "{}-{}-{}".format(
+    # run_id = "{}-{}-{}".format(
     #    args.agent, args.seed, time.strftime("%Y-%m-%d-%H-%M-%S")
-    #)
-    run_id = "{}-{}".format(
-       args.agent, args.seed
-    )
+    # )
+    run_id = "{}-{}".format(args.agent, args.seed)
     log_dir = os.path.join(args.logdir, args.agent, run_id)
     os.makedirs(log_dir, exist_ok=True)
     return log_dir
