@@ -66,29 +66,23 @@ def collect_group_preference_data(
     pref_dataset = []
     action_num = env.action_num
     group_num = env.group_num
-    print(weights)
-    group_id_1=0
-    group_id_2=0
-    group_counts = np.round(np.array(weights) * num).astype(int)
+
+    group_counts = np.ceil(np.array(weights) * num).astype(int)
     group_ids = [i for i, count in enumerate(group_counts) for _ in range(count)]
     np.random.shuffle(group_ids)
     group_ids=group_ids[:num]
+    
     for i in range(num):
         state = env.reset()
-        #group_id= int(np.random.choice(np.arange(group_num),1,p=np.array(weights)))
         group_id=group_ids[i]
-        #print(group_id)
-        if group_id==0:
-            group_id_1+=1
-        else:
-            group_id_2+=1
+        
         action_prob = policy_func(state,group_id)
         sampled_actions = np.random.choice(
             a=action_num, size=2, replace=False, p=action_prob  # replace=True
         )
         action_one, action_two = sampled_actions[0], sampled_actions[1]
         reward_one, reward_two = env.sample(action_one,group_id), env.sample(action_two,group_id)
-        # print(state, reward_one, reward_two, reward_two - reward_one)
+        
         if deterministic==True:
             pref= 0 if reward_one>reward_two else 1
         else:
@@ -101,7 +95,8 @@ def collect_group_preference_data(
             state, action_one, action_two, group_id, reward_one, reward_two, pref
         )
         pref_dataset.append(group_transition)
-    print(group_id_1,group_id_2)
+    
+    print(f"WEIGHTS: {weights}, COUNTS: {np.bincount(group_ids)}")
     return pref_dataset
 
 def collect_group_preference_data_plot(
@@ -249,23 +244,15 @@ def collect_group_preference_data_partial_deterministic_list(
     pref_dataset = []
     action_num = env.action_num
     group_num = env.group_num
-    print(weights)
-    group_id_1=0
-    group_id_2=0
     group_counts = np.round(np.array(weights) * num).astype(int)
     group_ids = [i for i, count in enumerate(group_counts) for _ in range(count)]
     np.random.shuffle(group_ids)
     group_ids=group_ids[:num]
     crt_count=np.zeros(group_num)
+    
     for i in range(num):
         state = env.reset()
-        #group_id= int(np.random.choice(np.arange(group_num),1,p=np.array(weights)))
         group_id=group_ids[i]
-        #print(group_id)
-        if group_id==0:
-            group_id_1+=1
-        else:
-            group_id_2+=1
         action_prob = policy_func(state,group_id)
         sampled_actions = np.random.choice(
             a=action_num, size=2, replace=False, p=action_prob  # replace=True
@@ -291,8 +278,8 @@ def collect_group_preference_data_partial_deterministic_list(
             state, action_one, action_two, group_id, reward_one, reward_two, pref
         )
         pref_dataset.append(group_transition)
-    print(group_id_1,group_id_2)
-    print(crt_count/group_counts*100,'crt_data')
+    print(f"WEIGHTS: {weights}, COUNTS: {np.bincount(group_ids)}")
+    print(crt_count/np.bincount(group_ids)*100,'crt_data')
     return pref_dataset
 
 
@@ -302,9 +289,9 @@ def collect_uneven_group_preference_data_partial_deterministic_list(
     pref_dataset = []
     action_num = env.action_num
     group_num = env.group_num
-    print(weights)
     group_id_1=0
     group_id_2=0
+
     group_counts = np.round(np.array(weights) * num).astype(int)
     group_ids = [i for i, count in enumerate(group_counts) for _ in range(count)]
     np.random.shuffle(group_ids)
@@ -312,9 +299,8 @@ def collect_uneven_group_preference_data_partial_deterministic_list(
     crt_count=np.zeros(group_num)
     for i in range(num):
         state = env.reset()
-        #group_id= int(np.random.choice(np.arange(group_num),1,p=np.array(weights)))
         group_id=group_ids[i]
-        #print(group_id)
+        
         if group_id==0:
             group_id_1+=1
         else:

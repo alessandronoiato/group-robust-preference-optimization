@@ -373,6 +373,8 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         neg_cur_data_grad = (self.reg_coef * coef * feature_diff_all)
         grad = np.sum(-neg_cur_data_grad, axis=0) / len(sampled_group_transitions)               ############### had self.group_weights[group_id] scaling before
         group_loss /= cur_group_counts
+        group_loss[np.isnan(group_loss)] = 0.0
+        # print(f"GROUP LOSS: {group_loss}")
 
         if self.l2_reg_rdpo != 0:
             grad += 2 * self.l2_reg_rdpo * self.param #/ len(sampled_group_transitions) # theta-gradient on loss L2 norm λ . ||θ||_F
@@ -397,6 +399,8 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 weighted_group_grad[group_id] = group_grad_weighted_sum / cur_group_counts[group_id] # len(sampled_group_transitions)  ############### had self.group_weights[group_id] scaling before
             else: # Importance Sampling has weights assigned to inv-freq and then group-grads divided by batch size
                 weighted_group_grad[group_id] = group_grad_weighted_sum / len(sampled_group_transitions)
+            # print(f"{weighted_group_grad=}")
+            weighted_group_grad[np.isnan(weighted_group_grad)] = 0.0
         
         if self.l2_reg_rdpo != 0:
             for g in range(self.group_num):
