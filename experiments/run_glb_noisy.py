@@ -72,6 +72,7 @@ def parse_args():
     parser.add_argument("--action_num", type=int, default=4)
     parser.add_argument("--group_num", type=int, default=2)
     parser.add_argument("--feature_type", type=str, default="same")
+    parser.add_argument("--log_dir", type=str, default=None)
     
     # Experiment args
     parser.add_argument("--seed", type=int, default=2023)
@@ -110,7 +111,7 @@ def parse_args():
     parser.add_argument("--mle_step_size", type=float, default=0.1)
 
     # Logging and evaluation args
-    parser.add_argument("--logdir", type=str, default="log")
+    parser.add_argument("--wandb_logdir", type=str, default="log")
     parser.add_argument("--eval_metric", type=str, default="expectation")
     parser.add_argument("--eval_metric_prob", type=str, default="KL")
 
@@ -170,13 +171,16 @@ def setup_wandb(args):
         group=wandb_group,
         project=args.wandb_project,
         config=args.__dict__,
-        dir=args.logdir,
+        dir=args.wandb_logdir,
         name=exp_name,
         tags=tags,
     )
 
 def setup_logging(args):
-    log_dir = create_log_dir(args)
+    if args.log_dir is None:
+        log_dir = create_log_dir(args)
+    else:
+        log_dir = args.log_dir
     save_code(log_dir)
     save_config(args.__dict__, log_dir)
     logger = Logger(log_dir)
@@ -267,7 +271,7 @@ def get_data(args, env):
 
     return train_data, val_data, test_data
 
-def train_mle_reward_model(args, feature_func, train_data, true_reward_param):
+def train_mle_reward_model(args, logger, feature_func, train_data, true_reward_param):
     reward_model = MLERewardLearning(
         feature_func,
         args.state_dim * 2,
@@ -284,7 +288,7 @@ def train_mle_reward_model(args, feature_func, train_data, true_reward_param):
 
     return reward_model
 
-def oracle_test(args, env, feature_func, learned_reward_param, test_data):
+def oracle_test(args, logger, env, feature_func, learned_reward_param, test_data):
     learned_env = GLB(
         args.state_dim,
         args.action_num,
@@ -293,15 +297,11 @@ def oracle_test(args, env, feature_func, learned_reward_param, test_data):
         feature_func,
         num_trials_for_eval=args.num_trials_for_eval,
     )
-    learned_oracle_opt_reward = env.evaluate_reward_group_wise(policy=lear
-    learned_env.get_opt_policy(), states=test_data)
+    learned_oracle_opt_reward = env.evaluate_reward_group_wise(policy=learned_env.get_opt_policy(), states=test_data)
     formatted_learned_oracle_opt_reward = ", ".join([f"{reward:.4f}" for reward in learned_oracle_opt_reward])
     logger.info(f"Learned oracle reward: {formatted_learned_oracle_opt_reward}")
-    
-    # Train policy on data
-    policy = train_and_evaluate_policy(args, env, feature_func, train_data, val_data, test_data)
 
-def get_agent(args, feature_dim, feature_func):
+def get_agent(args, logger, feature_dim, feature_func):
     if args.dpo_type == "dpo":
         return GDPO(
             state_dim=args.state_dim,
@@ -315,7 +315,7 @@ def get_agent(args, feature_dim, feature_func):
             num_iters=args.dpo_num_iters,
             is_adaptive=args.dpo_adaptive,
             ada_coef=args.dpo_ada_coef,
-            logger=args.logger,
+            logger=logger,
             wandb_use=args.wandb_use,
             ipo_grad_type=args.ipo_grad_type,
             param_limit=args.param_limit,
@@ -338,7 +338,7 @@ def get_agent(args, feature_dim, feature_func):
             ada_coef=args.dpo_ada_coef,
             batch_size=args.rdpo_batch_size,
             exp_step_size=args.rdpo_exp_step_size,
-            logger=args.logger,
+            logger=logger,
             wandb_use=args.wandb_use,
             weighted_batches=args.rdpo_weighted_batches,
             adj=args.rdpo_adj,
@@ -356,8 +356,9 @@ def get_agent(args, feature_dim, feature_func):
     else:
         raise ValueError(f"Unknown DPO type: {args.dpo_type}")
 
-def train_and_evaluate_agent(args, env, feature_dim, feature_func, opt_reward):
-    agent = get_agent(args)
+def train_and_evaluate_agent(args, logger, env, feature_dim, feature_func, train_data, val_data, test_data):
+    opt_reward = env.evaluate_reward_group_wise(policy=env.get_opt_policy(), states=test_data)
+    agent = get_agent(args, logger, feature_dim, feature_func)
 
     reward = agent.train(
         dataset=train_data,
@@ -428,21 +429,21 @@ def log_final_results(args, logger, env, agent, reward, feature_func, test_data)
                 d_wandb[key] = e
         wandb.log(d_wandb)
 
-def save_results(args, rew_error, reward):
+def save_results(args, rew_error, rew_dict):
     rew_err_dict = {args.pref_data_num: rew_error}
     rew_dict = {args.pref_data_num: reward}
     
-    save_path = os.path.join(args.logdir, f"reward_error_{args.dpo_type}.yml")
+    save_path = os.path.join(args.wandb_logdir, f"reward_error_{args.dpo_type}.yml")
     yaml.dump(rew_err_dict, open(save_path, "w"), default_flow_style=False)
     
-    save_path = os.path.join(args.logdir, f"reward_{args.dpo_type}.yml")
+    save_path = os.path.join(args.wandb_logdir, f"reward_{args.dpo_type}.yml")
     yaml.dump(rew_dict, open(save_path, "w"), default_flow_style=False)
 
 def main(args):
     np.random.seed(args.seed)
 
     # Wandb
-    setup_wandb()
+    setup_wandb(args)
 
     # Initialize logging
     logger = setup_logging(args)
@@ -454,13 +455,13 @@ def main(args):
     train_data, val_data, test_data = get_data(args, env)
     
     # Train and evaluate MLE reward model
-    reward_model = train_mle_reward_model(args, feature_func, train_data, env.reward_param)
+    reward_model = train_mle_reward_model(args, logger, feature_func, train_data, env.reward_param)
 
     # Oracle Test
-    oracle_test(args, env, feature_func, learned_reward_param, test_data)
+    oracle_test(args, logger, env, feature_func, reward_model.get_reward_param, test_data)
 
     # Train agent
-    agent, reward = train_and_evaluate_agent(args, env, feature_dim, feature_func, opt_reward)
+    agent, reward = train_and_evaluate_agent(args, logger, env, feature_dim, feature_func, train_data, val_data, test_data)
 
     # Log final results
     log_final_results(args, logger, env, agent, reward, feature_func, test_data)

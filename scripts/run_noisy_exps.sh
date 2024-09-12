@@ -34,7 +34,8 @@ USE_THEORY='False'
 WEIGHTS="[1,1,1]"
 VAL_WEIGHTS="[1,1,1]"
 TEST_WEIGHTS="[1,1,1]"
-WANDB_GROUP='noise_level_experiment'
+WANDB_GROUP='noisy_experiment'
+CHI=1
 
 # Timestamp for meta log directory
 TIMESTAMP=$(date +'%Y_%m_%d_%H_%M_%S')
@@ -49,7 +50,7 @@ NOISE_LEVELS=("1.0") # ("1.0" "0.9" "0.8" "0.7" "0.6")
 FEATURE_TYPES=("same") # ("same" "flipped" "swapped")
 
 # DPO types
-DPO_TYPES=("dpo") # ("dpo" "rdpo")
+DPO_TYPES=("rdpo") # ("dpo" "rdpo")
 
 # Main loop
 for DPO_TYPE in "${DPO_TYPES[@]}"; do
@@ -67,7 +68,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
 			VAL_DETERMINISTIC_RATIO_LIST="[1,1,1]" # Change when group_num changes
                 
             for SEED in "${SEEDS[@]}"; do
-                python -m experiments.run_glb \
+                python -m experiments.run_glb_noisy \
                 --mle_adaptive \
                 --state_dim ${STATE_DIM} \
                 --action_num ${ACTION_NUM} \
@@ -79,9 +80,9 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
                 --reg_coef ${REG_COEF} \
                 --seed ${SEED} \
                 --weights ${WEIGHTS}  \
-				--val_weights ${VAL_WEIGHTS} \
-				--test_weights ${TEST_WEIGHTS}
-                --logdir ${SUB_LOG_DIR} \
+		--val_weights ${VAL_WEIGHTS} \
+		--test_weights ${TEST_WEIGHTS} \
+                --log_dir ${SUB_LOG_DIR} \
                 --dpo_type ${DPO_TYPE} \
                 --dpo_step_size ${STEP_SIZE} \
                 --rdpo_exp_step_size ${EXP_STEP_SIZE} \
@@ -105,6 +106,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
                 --use_uneven_grp ${USE_UNEVEN_GRP} \
                 --use_uneven_grp_val ${USE_UNEVEN_GRP_VAL} \
                 --use_theory ${USE_THEORY} \
+		--wandb_logdir "${SUB_LOG_DIR}/log" \
                 --chi ${CHI}
             done
         done

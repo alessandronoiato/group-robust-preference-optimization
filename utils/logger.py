@@ -2,7 +2,7 @@ import logging
 from logging import handlers
 
 import sys
-from rich.console import console
+from rich.console import Console
 from rich.logging import RichHandler
 
 level_relations = {

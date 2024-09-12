@@ -684,7 +684,6 @@ class GroupDirectPolicyOptimizationVectorised:
     ) -> float:
         print("ipo grad type: ", self.ipo_grad_type)
         if self.ipo_grad_type == "Regression":
-            print("Hellooooo Regression IPO")
             """
             grad_norm=self.evaluate_ipo_grad(dataset)
             live_grad=grad_norm
@@ -842,6 +841,7 @@ class GroupDirectPolicyOptimizationVectorised:
                 print(logging_str)
             rew = self.evaluate_reward(env, test_dataset)
             return rew
+        
         for step in range(self.num_iters):
             grad_norm = self.update_once(dataset)
             if step % self.report_iter == 0:
@@ -865,8 +865,6 @@ class GroupDirectPolicyOptimizationVectorised:
                 kl_dist = self.evaluate_KL(env=env, states=test_dataset)
 
                 # Evaluate the reward on the test dataset:
-                # print(optimal_reward,self.evaluate_reward(env=env,
-                #                           states=test_dataset))
                 rew_err = [
                     float(a - b) / a for a, b in zip(optimal_reward, self.evaluate_reward(env=env, states=test_dataset))
                 ]

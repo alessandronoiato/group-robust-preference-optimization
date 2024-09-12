@@ -124,7 +124,7 @@ def parse_args():
     parser.add_argument("--pg_step_size", type=float, default=0.1)
 
     parser.add_argument("--wandb_use", action="store_true")
-    parser.add_argument("--wandb_key", type=str, default="eb687170e674596d211e8f521a3524aac14a07db")
+    parser.add_argument("--wandb_key", type=str, default="cd7b1433bad4eb38b457b881d01b17040a0b2432")
     parser.add_argument("--wandb_entity", type=str, default="robust-rl-project")
     parser.add_argument("--wandb_project", type=str, default="bandits_dpo")
     parser.add_argument("--wandb_group", type=str, default="group1")
@@ -376,7 +376,6 @@ def main(args):
             reg_coef=args.reg_coef,
             step_size=args.dpo_step_size,
             num_iters=args.dpo_num_iters,
-            exp_adaptive=args.exp_adaptive,
             is_adaptive=args.dpo_adaptive,
             ada_coef=args.dpo_ada_coef,
             logger=logger,
