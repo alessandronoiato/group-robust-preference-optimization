@@ -2,34 +2,26 @@ import argparse
 import ast
 import copy
 import os
+from typing import List
 
 import numpy as np
 import yaml
+import wandb
 
 from algos.linear_bandit.group_dpo_vectorised import GroupDirectPolicyOptimizationVectorised as GDPO
-from algos.linear_bandit.group_robust_dpo_vectorised_gradfix import (
-    GroupRobustDirectPolicyOptimizationVectorised as GRDPO,
-)
+from algos.linear_bandit.group_robust_dpo_vectorised_gradfix import GroupRobustDirectPolicyOptimizationVectorised as GRDPO
 from algos.linear_bandit.mle import MLERewardLearning
-from envs.group_linear_bandit import GroupLinearBandit as GLB
-from envs.group_linear_bandit import GroupLinearBanditSep as GLBS
+from envs.group_linear_bandit import GroupLinearBandit as GLB, GroupLinearBanditSep as GLBS
 from envs.group_linear_bandit import ret_feature_func
 from utils.collect_data import (
     collect_group_preference_data,
-    collect_group_preference_data_partial_deterministic,
     collect_group_preference_data_partial_deterministic_list,
-    collect_group_preference_data_wth_deterministic_list,
-    collect_preference_data,
-    collect_rl_data,
     collect_uneven_group_preference_data_partial_deterministic_list,
-    merge_datasets,
-    pref_to_rl,
     ret_uniform_policy_group,
 )
 from utils.io_utils import create_log_dir, save_code, save_config
 from utils.logger import Logger
 from utils.utils import return_apt_weights, softmax
-
 
 def float_list(arg):
     try:
@@ -37,8 +29,6 @@ def float_list(arg):
         # This will handle '[0.5,0.3]' correctly
         return [float(item) for item in ast.literal_eval(arg)]
     except (ValueError, SyntaxError) as e:
-        print("ERROR: ", arg)
-        print(e)
         raise argparse.ArgumentTypeError("Invalid list format or elements are not floats")
 
 
@@ -74,68 +64,58 @@ def ret_policy(action_num: int, feature_func, param):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Group Linear Bandit Noisy Experiment")
+
+    # Environment args
     parser.add_argument("--env", type=str, default="group_linear_bandit")
     parser.add_argument("--state_dim", type=int, default=1)
     parser.add_argument("--action_num", type=int, default=4)
     parser.add_argument("--group_num", type=int, default=2)
     parser.add_argument("--feature_type", type=str, default="same")
+    
+    # Experiment args
     parser.add_argument("--seed", type=int, default=2023)
-    parser.add_argument("--agent", type=str, default="pg")
-    parser.add_argument("--logdir", type=str, default="log")
-    parser.add_argument("--eval_metric", type=str, default="expectation")
-    parser.add_argument("--eval_metric_prob", type=str, default="KL")
-
-    parser.add_argument(
-        "--deterministic_ratio_list",
-        type=float_list,
-        help="A list of determinisitic ratios as a string",
-        default="[0,0]",
-    )
-
-    parser.add_argument("--val_deterministic", type=lambda x: (str(x).lower() == "true"), default=False)
-    parser.add_argument(
-        "--val_deterministic_ratio_list",
-        type=float_list,
-        help="A list of determinisitic ratios as a string",
-        default="[0,0]",
-    )
-
     parser.add_argument("--pref_data_num", type=int, default=500)
-    parser.add_argument("--weights", type=str, default="equal")
-
     parser.add_argument("--val_data_num", type=int, default=50)
-    parser.add_argument("--val_weights", type=str, default="equal")
+    parser.add_argument("--num_trials_for_eval", type=int, default=1000) # Test Data size
 
-    parser.add_argument("--num_trials_for_eval", type=int, default=1000)
+    # Algorithm args
+    parser.add_argument("--agent", type=str, default="pg")
+    parser.add_argument("--dpo_type", type=str, default="dpo")
+    parser.add_argument("--reg_coef", type=float, default=1.0)
+    parser.add_argument("--dpo_num_iters", type=int, default=200)
+    parser.add_argument("--dpo_step_size", type=float, default=0.1)
+    parser.add_argument("--dpo_adaptive", action="store_true")
+    parser.add_argument("--dpo_ada_coef", type=float, default=1.0)
+
+    # RDPO args
+    parser.add_argument("--rdpo_batch_size", type=int, default=5)
+    parser.add_argument("--rdpo_exp_step_size", type=float, default=0.01)
+    parser.add_argument("--rdpo_weighted_batches", type=lambda x: (str(x).lower() == "true"), default=True)
+    parser.add_argument("--rdpo_adj", type=str, default="0")
+    parser.add_argument("--exp_adaptive", type=float, default=0.0)
+
+    # Data args
+    parser.add_argument("--deterministic_ratio_list", type=float_list, default="[0,0]")
+    parser.add_argument("--val_deterministic", type=lambda x: (str(x).lower() == "true"), default=False)
+    parser.add_argument("--val_deterministic_ratio_list", type=float_list, default="[0,0]")
+    parser.add_argument("--weights", type=str, default="equal")
+    parser.add_argument("--val_weights", type=str, default="equal")
     parser.add_argument("--test_weights", type=str, default="equal")
 
+    # MLE args
     parser.add_argument("--mle_num_iters", type=int, default=100)
     parser.add_argument("--mle_adaptive", action="store_true")
     parser.add_argument("--mle_ada_coef", type=float, default=1.0)
     parser.add_argument("--mle_step_size", type=float, default=0.1)
 
-    parser.add_argument("--reg_coef", type=float, default=1.0)
+    # Logging and evaluation args
+    parser.add_argument("--logdir", type=str, default="log")
+    parser.add_argument("--eval_metric", type=str, default="expectation")
+    parser.add_argument("--eval_metric_prob", type=str, default="KL")
 
-    parser.add_argument("--dpo_type", type=str, default="dpo")
-    parser.add_argument("--dpo_num_iters", type=int, default=200)
-    parser.add_argument("--exp_adaptive", type=float, default=0.0)
-    parser.add_argument("--dpo_adaptive", action="store_true")
-    parser.add_argument("--dpo_ada_coef", type=float, default=1.0)
-    parser.add_argument("--dpo_step_size", type=float, default=0.1)
-    parser.add_argument("--rdpo_batch_size", type=int, default=5)
-    parser.add_argument("--rdpo_exp_step_size", type=float, default=0.01)
-    parser.add_argument(
-        "--rdpo_weighted_batches",
-        type=lambda x: (str(x).lower() == "true"),
-        default=True,
-    )
-    parser.add_argument("--rdpo_adj", type=str, default="0")
-    parser.add_argument(
-        "--importance_sampling",
-        type=lambda x: (str(x).lower() == "true"),
-        default=False,
-    )
+    # Other
+    parser.add_argument("--importance_sampling", type=lambda x: (str(x).lower() == "true"), default=False)
     parser.add_argument("--importance_sampling_weights", type=str, default="None")
     parser.add_argument("--ipo_grad_type", type=str, default="justdpo")
     parser.add_argument("--param_limit", type=int, default=1)
@@ -146,7 +126,9 @@ def parse_args():
     parser.add_argument("--use_uneven_grp", type=lambda x: (str(x).lower() == "true"), default=False)
     parser.add_argument("--use_uneven_grp_val", type=lambda x: (str(x).lower() == "true"), default=False)
     parser.add_argument("--use_theory", type=lambda x: (str(x).lower() == "true"), default=False)
+    parser.add_argument("--chi", type=float, default=1.0)
 
+    # Wandb args
     parser.add_argument("--wandb_use", action="store_true")
     parser.add_argument("--wandb_key", type=str, default="cd7b1433bad4eb38b457b881d01b17040a0b2432")
     parser.add_argument("--wandb_entity", type=str, default="robust-rl-project")
@@ -154,97 +136,93 @@ def parse_args():
     parser.add_argument("--wandb_group", type=str, default="group1")
     parser.add_argument("--wandb_name", type=str, default="linear_bandits")
 
-    parser.add_argument("--chi", type=float, default=1.0)
-
     return parser.parse_args()
 
+def setup_wandb(args):
+    wandb.login(key=args.wandb_key)
 
-def main(args):
-    np.random.seed(args.seed)
+    # Tags
+    if args.dpo_adaptive:
+        tags = [
+            args.dpo_num_iters,
+            f"adaptive_{args.dpo_adaptive}",
+            args.dpo_ada_coef,
+            args.reg_coef,
+        ]
+    else:
+        tags = [
+            f"num_iters_{args.dpo_num_iters}",
+            f"adaptive_{args.dpo_adaptive}",
+            f"step_size_{args.dpo_step_size}",
+            f"beta_{args.reg_coef}",
+        ]
 
-    # Logging
+    # Experiment Name
+    if args.dpo_type == "dpo":
+        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.seed}"
+    else:
+        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.rdpo_exp_step_size}_{args.rdpo_batch_size}_{args.rdpo_weighted_batches}_{args.rdpo_adj}_{args.seed}"
+    
+    # Group
+    wandb_group = f"state_dim={args.state_dim},action_num={args.action_num},group_num{args.group_num},pref_data_num={args.pref_data_num},weights={args.weights},feature_type={args.feature_type},eval_metric={args.eval_metric},{args.wandb_group}"
+
+    wandb.init(
+        group=wandb_group,
+        project=args.wandb_project,
+        config=args.__dict__,
+        dir=args.logdir,
+        name=exp_name,
+        tags=tags,
+    )
+
+def setup_logging(args):
     log_dir = create_log_dir(args)
     save_code(log_dir)
     save_config(args.__dict__, log_dir)
     logger = Logger(log_dir)
+    
+    logger.info(f"Logging to {log_dir}")
+    logger.info(f"(IB) Seed: {args.seed}")
+    logger.info(f"(IB) Data: {args.pref_data_num}")
+    
+    return logger
 
-    print(f"Logging to {log_dir}")
-    print(f"(IB) Seed: {args.seed}")
-    print(f"(IB) Data: {args.pref_data_num}")
-
-    state_dim = args.state_dim
-    action_num = args.action_num
-    group_num = args.group_num
-    num_trials_for_eval = args.num_trials_for_eval
-
-    feature_dim = 2 * state_dim
+def setup_environment(args):
+    feature_dim = 2 * args.state_dim
     feature_func = ret_feature_func(
-        num_action=action_num,
-        state_dim=state_dim,
-        group_num=group_num,
+        num_action=args.action_num,
+        state_dim=args.state_dim,
+        group_num=args.group_num,
         feature_type=args.feature_type,
     )
-
-    reward_param = set_reward_params(feature_dim=feature_dim)
-
-    # WANDB setup
-    print(f"{args.wandb_use=}")
+    
+    reward_param = set_reward_params(feature_dim)
     if args.wandb_use:
-        print("USING WANDB")
-        wandb.login(key=args.wandb_key)
-
-        if args.dpo_adaptive:
-            tags = [
-                args.dpo_num_iters,
-                f"adaptive_{args.dpo_adaptive}",
-                args.ada_coef,
-                args.reg_coef,
-            ]
-        else:
-            tags = [
-                f"num_iters_{args.dpo_num_iters}",
-                f"adaptive_{args.dpo_adaptive}",
-                f"step_size_{args.dpo_step_size}",
-                f"beta_{args.reg_coef}",
-            ]
-
-        if args.dpo_type == "dpo":
-            exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.seed}"
-        else:
-            exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.rdpo_exp_step_size}_{args.rdpo_batch_size}_{args.rdpo_weighted_batches}_{args.rdpo_adj}_{args.seed}"
-
-        wandb_group = f"state_dim={args.state_dim},action_num={args.action_num},group_num{args.group_num},pref_data_num={args.pref_data_num},weights={args.weights},feature_type={args.feature_type},eval_metric={args.eval_metric},args.wandb_group"
-        wandb.init(
-            group=wandb_group,
-            project=args.wandb_project,
-            config=args.__dict__,
-            dir=log_dir,
-            name=exp_name,
-            tags=tags,
-        )
-
         wandb.config["true_reward_params"] = reward_param
-
+       
     env = GLBS(
-        state_dim=state_dim,
-        action_num=action_num,
-        group_num=group_num,
+        state_dim=args.state_dim,
+        action_num=args.action_num,
+        group_num=args.group_num,
         reward_param=reward_param,
         feature_func=feature_func,
-        num_trials_for_eval=num_trials_for_eval,
+        num_trials_for_eval=args.num_trials_for_eval,
         eval_metric=args.eval_metric,
         eval_metric_prob=args.eval_metric_prob,
     )
 
-    weights = return_apt_weights(args.weights, group_num)
-    val_weights = return_apt_weights(args.val_weights, group_num)
-    test_weights = return_apt_weights(args.test_weights, group_num)
+    return env, feature_dim, feature_func
 
-    opt_policy = env.get_opt_policy()
-    uniform_policy = ret_uniform_policy_group(action_num)
-
+def get_data(args, env):
+    weights = return_apt_weights(args.weights, args.group_num)
+    val_weights = return_apt_weights(args.val_weights, args.group_num)
+    test_weights = return_apt_weights(args.test_weights, args.group_num)
+    
+    uniform_policy = ret_uniform_policy_group(args.action_num)
+    
+    # Train Data
     if args.use_uneven_grp:
-        pref_data = collect_uneven_group_preference_data_partial_deterministic_list(
+        train_data = collect_uneven_group_preference_data_partial_deterministic_list(
             args.pref_data_num,
             env,
             weights,
@@ -252,16 +230,17 @@ def main(args):
             deterministic_ratio_list=args.deterministic_ratio_list,
         )
     else:
-        pref_data = collect_group_preference_data_partial_deterministic_list(
+        train_data = collect_group_preference_data_partial_deterministic_list(
             args.pref_data_num,
             env,
             weights,
             uniform_policy,
             deterministic_ratio_list=args.deterministic_ratio_list,
         )
-
+    
+    # Val Data
     if args.use_uneven_grp_val:
-        val_pref = collect_uneven_group_preference_data_partial_deterministic_list(
+        val_data = collect_uneven_group_preference_data_partial_deterministic_list(
             args.num_trials_for_eval,
             env,
             val_weights,
@@ -269,7 +248,7 @@ def main(args):
             deterministic_ratio_list=args.val_deterministic_ratio_list,
         )
     else:
-        val_pref = collect_group_preference_data_partial_deterministic_list(
+        val_data = collect_group_preference_data_partial_deterministic_list(
             args.num_trials_for_eval,
             env,
             val_weights,
@@ -277,76 +256,66 @@ def main(args):
             deterministic_ratio_list=args.val_deterministic_ratio_list,
         )
 
-    test_pref = collect_group_preference_data(
-        num=num_trials_for_eval,
+    # Test Data
+    test_data = collect_group_preference_data(
+        num=args.num_trials_for_eval,
         env=env,
         weights=test_weights,
         policy_func=uniform_policy,
         deterministic=True,
     )
 
-    opt_reward = env.evaluate_reward_group_wise(policy=opt_policy, states=test_pref)
-    uni_reward = env.evaluate_reward_group_wise(policy=uniform_policy, states=test_pref)
+    return train_data, val_data, test_data
 
-    formatted_opt_reward = ", ".join([f"{reward:.4f}" for reward in opt_reward])
-    formatted_uni_reward = ", ".join([f"{reward:.4f}" for reward in uni_reward])
-    logger.info(f"optimal policy reward: {formatted_opt_reward}, uniform policy reward: {uni_reward}.")
-
-    # learn the reward function
+def train_mle_reward_model(args, feature_func, train_data, true_reward_param):
     reward_model = MLERewardLearning(
         feature_func,
-        feature_dim,
+        args.state_dim * 2,
         args.mle_step_size,
         args.mle_num_iters,
         args.mle_adaptive,
         args.mle_ada_coef,
     )
-    loss, l2_dist, acc = reward_model.train_by_cvxpy_group(dataset=pref_data, true_reward_param=reward_param)
-    logger.info(f"Reward loss: {loss:.4f}, l2 distance: {l2_dist:.4f}, acc: {acc:.2f}.")
+    loss, l2_dist, acc = reward_model.train_by_cvxpy_group(dataset=train_data, true_reward_param=true_reward_param)
+    
+    logger.info(f"MLE reward loss: {loss:.4f}, l2 distance: {l2_dist:.4f}, acc: {acc:.2f}.")
+    logger.info("True reward parameter: {}".format(true_reward_param))
+    logger.info("MLE reward parameter: {}".format(reward_model.get_reward_param))
 
-    learned_reward_param = reward_model.get_reward_param
-    logger.info("True reward parameter: {}".format(reward_param))
-    logger.info("Learned reward parameter: {}".format(learned_reward_param))
+    return reward_model
 
-    # Oracle test
+def oracle_test(args, env, feature_func, learned_reward_param, test_data):
     learned_env = GLB(
-        state_dim,
-        action_num,
-        group_num,
+        args.state_dim,
+        args.action_num,
+        args.group_num,
         learned_reward_param,
         feature_func,
-        num_trials_for_eval=num_trials_for_eval,
+        num_trials_for_eval=args.num_trials_for_eval,
     )
-    learned_oracle_opt_policy = learned_env.get_opt_policy()
-    learned_oracle_opt_reward = env.evaluate_reward_group_wise(policy=learned_oracle_opt_policy, states=test_pref)
-
+    learned_oracle_opt_reward = env.evaluate_reward_group_wise(policy=lear
+    learned_env.get_opt_policy(), states=test_data)
     formatted_learned_oracle_opt_reward = ", ".join([f"{reward:.4f}" for reward in learned_oracle_opt_reward])
     logger.info(f"Learned oracle reward: {formatted_learned_oracle_opt_reward}")
+    
+    # Train policy on data
+    policy = train_and_evaluate_policy(args, env, feature_func, train_data, val_data, test_data)
 
-    # Train the RL on the preference data
-    logger.info(f"Train a policy solely on the preference data (DPO).")
-
-    # learn the policy
-    policy_feature_func = ret_feature_func(
-        num_action=action_num,
-        state_dim=state_dim,
-        group_num=group_num,
-        feature_type=args.feature_type,
-    )
+def get_agent(args, feature_dim, feature_func):
     if args.dpo_type == "dpo":
-        agent = GDPO(
-            state_dim=state_dim,
-            action_num=action_num,
-            group_num=group_num,
+        return GDPO(
+            state_dim=args.state_dim,
+            action_num=args.action_num,
+            group_num=args.group_num,
             feature_dim=feature_dim,
-            feature_func=policy_feature_func,
-            ref_policy=uniform_policy,
+            feature_func=feature_func,
+            ref_policy=ret_uniform_policy_group(args.action_num),
             reg_coef=args.reg_coef,
             step_size=args.dpo_step_size,
             num_iters=args.dpo_num_iters,
             is_adaptive=args.dpo_adaptive,
             ada_coef=args.dpo_ada_coef,
-            logger=logger,
+            logger=args.logger,
             wandb_use=args.wandb_use,
             ipo_grad_type=args.ipo_grad_type,
             param_limit=args.param_limit,
@@ -354,13 +323,13 @@ def main(args):
             report_iter=100,
         )
     elif args.dpo_type == "rdpo":
-        agent = GRDPO(
-            state_dim=state_dim,
-            action_num=action_num,
-            group_num=group_num,
+        return GRDPO(
+            state_dim=args.state_dim,
+            action_num=args.action_num,
+            group_num=args.group_num,
             feature_dim=feature_dim,
-            feature_func=policy_feature_func,
-            ref_policy=uniform_policy,
+            feature_func=feature_func,
+            ref_policy=ret_uniform_policy_group(args.action_num),
             reg_coef=args.reg_coef,
             step_size=args.dpo_step_size,
             num_iters=args.dpo_num_iters,
@@ -369,7 +338,7 @@ def main(args):
             ada_coef=args.dpo_ada_coef,
             batch_size=args.rdpo_batch_size,
             exp_step_size=args.rdpo_exp_step_size,
-            logger=logger,
+            logger=args.logger,
             wandb_use=args.wandb_use,
             weighted_batches=args.rdpo_weighted_batches,
             adj=args.rdpo_adj,
@@ -385,90 +354,58 @@ def main(args):
             report_iter=100,
         )
     else:
-        agent = GDPO(
-            state_dim=state_dim,
-            action_num=action_num,
-            group_num=group_num,
-            feature_dim=feature_dim,
-            feature_func=policy_feature_func,
-            ref_policy=uniform_policy,
-            reg_coef=args.reg_coef,
-            step_size=args.dpo_step_size,
-            num_iters=args.dpo_num_iters,
-            exp_adaptive=args.exp_adaptive,
-            is_adaptive=args.dpo_adaptive,
-            ada_coef=args.dpo_ada_coef,
-            logger=logger,
-            wandb_use=args.wandb_use,
-            ipo_grad_type=args.ipo_grad_type,
-            param_limit=args.param_limit,
-            lamba=args.lamba,
-            train_agent=False,  # random_train() func called instead of train()
-            report_iter=100,
-        )
+        raise ValueError(f"Unknown DPO type: {args.dpo_type}")
 
-    if agent.train_agent == True:
-        if args.use_weight_val == False:
-            reward = agent.train(
-                dataset=pref_data,
-                val_dataset=val_pref,
-                test_dataset=test_pref,
-                env=env,
-                optimal_reward=opt_reward,
-            )
-        else:
-            reward = agent.alternate_train(
-                dataset=pref_data,
-                weight_val_dataset=weight_val_pref,
-                val_dataset=val_pref,
-                test_dataset=test_pref,
-                env=env,
-                optimal_reward=opt_reward,
-            )
-    else:
-        reward = agent.random_train(
-            dataset=pref_data,
-            val_dataset=val_pref,
-            test_dataset=test_pref,
-            env=env,
-            optimal_reward=opt_reward,
-        )
-    formatted_reward = ", ".join([f"{reward:.4f}" for reward in reward])
-    rew_error = [float((a - b) / a) for a, b in zip(opt_reward, reward)]
-    formatted_rew_error = ", ".join([f"{reward:.4f}" for reward in rew_error])
-    policy_param = agent.get_param
-    logger.info(f"Policy parameter learned solely on the preference data {args.dpo_type}: {policy_param}.")
-    logger.info(
-        f"Training solely on the preference data {args.dpo_type}, dataset size: {len(pref_data): d}, optimal reward: {formatted_opt_reward}, reward: {formatted_reward}, reward error: {formatted_rew_error}."
+def train_and_evaluate_agent(args, env, feature_dim, feature_func, opt_reward):
+    agent = get_agent(args)
+
+    reward = agent.train(
+        dataset=train_data,
+        val_dataset=val_data,
+        test_dataset=test_data,
+        env=env,
+        optimal_reward=opt_reward,
     )
 
-    rew_err_dict, rew_dict = dict(), dict()
-    rew_err_dict[args.pref_data_num] = rew_error
-    rew_dict[args.pref_data_num] = reward
+    return agent, reward
 
-    save_path = os.path.join(log_dir, f"reward_error_{args.dpo_type}.yml")
-    yaml.dump(rew_err_dict, open(save_path, "w"), default_flow_style=False)
-    save_path = os.path.join(log_dir, f"reward_{args.dpo_type}.yml")
-    yaml.dump(rew_dict, open(save_path, "w"), default_flow_style=False)
+def log_final_results(args, logger, env, agent, reward, feature_func, test_data):
+    policy_param = agent.get_param
+    logger.info(f"Policy parameter learned solely on the preference data {args.dpo_type}: {policy_param}.")
+    
+    opt_reward = env.evaluate_reward_group_wise(policy=env.get_opt_policy(), states=test_data)
+    uni_reward = env.evaluate_reward_group_wise(policy=ret_uniform_policy_group(args.action_num), states=test_data)
+    rew_error = [float((a - b) / a) for a, b in zip(opt_reward, reward)]
 
-    # calculating errors if param is known
+    formatted_opt_reward = ", ".join([f"{reward:.4f}" for reward in opt_reward])
+    formatted_uni_reward = ", ".join([f"{reward:.4f}" for reward in uni_reward])
+    formatted_reward = ", ".join([f"{reward:.4f}" for reward in reward])
+    formatted_rew_error = ", ".join([f"{reward:.4f}" for reward in rew_error])
+    
+    logger.info(f"Uniform reward: {formatted_uni_reward}")
+    logger.info(f"Optimal reward: {formatted_opt_reward}")
+    logger.info(f"Policy reward: {formatted_reward}")
+    logger.info(f"Reward Error: {formatted_rew_error}")
+
+    save_results(args, rew_error, reward)
+
+    # Calculating errors if param is known
     known_param_rewards = []
     known_param_rew_err = []
-    for i in range(group_num):
+    for i in range(args.group_num):
         reward = env.evaluate_reward_group_wise(
-            policy=ret_policy(action_num, policy_feature_func, reward_param[i]),
-            states=test_pref,
+            policy=ret_policy(args.action_num, feature_func, env.reward_param[i]),
+            states=test_data,
         )
         reward_err = [float((a - b) / a) for a, b in zip(opt_reward, reward)]
         known_param_rewards.append(reward)
         known_param_rew_err.append(reward_err)
     logger.info(
-        f"optimal reward: {formatted_opt_reward}, known_param_reward: {known_param_rewards}, Known param reward error: {known_param_rew_err}."
+        f"Optimal reward: {formatted_opt_reward}\nKnown param reward: {known_param_rewards}, Known param reward error: {known_param_rew_err}."
     )
-
+    
     if args.wandb_use:
         d_wandb = {}
-        # Assuming rew_err is a list
         for i, err in enumerate(rew_error):
             key = f"final/reward_err_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
             d_wandb[key] = err
@@ -489,10 +426,48 @@ def main(args):
             for j, e in enumerate(err):
                 key = f"reward_error_{j}_when_{i + 1}_group_param_known"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
                 d_wandb[key] = e
-
         wandb.log(d_wandb)
-        wandb.finish()
 
+def save_results(args, rew_error, reward):
+    rew_err_dict = {args.pref_data_num: rew_error}
+    rew_dict = {args.pref_data_num: reward}
+    
+    save_path = os.path.join(args.logdir, f"reward_error_{args.dpo_type}.yml")
+    yaml.dump(rew_err_dict, open(save_path, "w"), default_flow_style=False)
+    
+    save_path = os.path.join(args.logdir, f"reward_{args.dpo_type}.yml")
+    yaml.dump(rew_dict, open(save_path, "w"), default_flow_style=False)
+
+def main(args):
+    np.random.seed(args.seed)
+
+    # Wandb
+    setup_wandb()
+
+    # Initialize logging
+    logger = setup_logging(args)
+
+    # Environment
+    env, feature_dim, feature_func = setup_environment(args)
+    
+    # Generate data
+    train_data, val_data, test_data = get_data(args, env)
+    
+    # Train and evaluate MLE reward model
+    reward_model = train_mle_reward_model(args, feature_func, train_data, env.reward_param)
+
+    # Oracle Test
+    oracle_test(args, env, feature_func, learned_reward_param, test_data)
+
+    # Train agent
+    agent, reward = train_and_evaluate_agent(args, env, feature_dim, feature_func, opt_reward)
+
+    # Log final results
+    log_final_results(args, logger, env, agent, reward, feature_func, test_data)
+    
+    # Clean up
+    if args.wandb_use:
+        wandb.finish()
 
 if __name__ == "__main__":
     main(parse_args())
