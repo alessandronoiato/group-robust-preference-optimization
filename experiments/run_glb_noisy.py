@@ -11,8 +11,7 @@ import wandb
 from algos.linear_bandit.group_dpo_vectorised import GroupDirectPolicyOptimizationVectorised as GDPO
 from algos.linear_bandit.group_robust_dpo_vectorised_gradfix import GroupRobustDirectPolicyOptimizationVectorised as GRDPO
 from algos.linear_bandit.mle import MLERewardLearning
-from envs.group_linear_bandit import GroupLinearBandit as GLB, GroupLinearBanditSep as GLBS
-from envs.group_linear_bandit import ret_feature_func
+from envs.group_linear_bandit import GroupLinearBandit as GLB, GroupLinearBanditSep as GLBS, ret_feature_func
 from utils.collect_data import (
     collect_group_preference_data,
     collect_group_preference_data_partial_deterministic_list,
@@ -32,17 +31,27 @@ def float_list(arg):
         raise argparse.ArgumentTypeError("Invalid list format or elements are not floats")
 
 
-def set_reward_params(feature_dim: int):
+def set_reward_params(feature_dim: int, group_num: int):
     assert feature_dim in (4,)
     if feature_dim == 4:
-        rparams = np.array(
-            [
-                [1.0, 3.0, 1.0, 3.0],
-                [3.0, 1.0, 3.0, 1.0],
-                [1.5, 2.5, 1.5, 2.5],
-            ],
-            np.float32,
-        )
+        if group_num == 3:
+            rparams = np.array(
+                [
+                    [1.0, 3.0, 1.0, 3.0],
+                    [3.0, 1.0, 3.0, 1.0],
+                    [1.5, 2.5, 1.5, 2.5],
+                ],
+                np.float32,
+            )
+        elif group_num == 2:
+            rparams = np.array(
+                [
+                    [1.0, 3.0, 1.0, 3.0],
+                    [3.0, 1.0, 3.0, 1.0],
+                ],
+                np.float32,
+            )
+    
     return rparams
 
 
@@ -156,16 +165,17 @@ def setup_wandb(args):
             f"adaptive_{args.dpo_adaptive}",
             f"step_size_{args.dpo_step_size}",
             f"beta_{args.reg_coef}",
+            f"drl_{args.deterministic_ratio_list}",
         ]
 
     # Experiment Name
     if args.dpo_type == "dpo":
         exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.seed}"
     else:
-        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.rdpo_exp_step_size}_{args.rdpo_batch_size}_{args.rdpo_weighted_batches}_{args.rdpo_adj}_{args.seed}"
+        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.rdpo_exp_step_size}_{args.rdpo_batch_size}_{args.rdpo_weighted_batches}_{args.rdpo_adj}_{args.deterministic_ratio_list}_{args.seed}"
     
     # Group
-    wandb_group = f"state_dim={args.state_dim},action_num={args.action_num},group_num{args.group_num},pref_data_num={args.pref_data_num},weights={args.weights},feature_type={args.feature_type},eval_metric={args.eval_metric},{args.wandb_group}"
+    wandb_group = f"state_dim{args.state_dim}action_num={args.action_num}group_num{args.group_num}pref_data_num{args.pref_data_num}weights={args.weights}feature_type{args.feature_type}eval_metric{args.eval_metric}{args.wandb_group}"
 
     wandb.init(
         group=wandb_group,
@@ -200,7 +210,7 @@ def setup_environment(args):
         feature_type=args.feature_type,
     )
     
-    reward_param = set_reward_params(feature_dim)
+    reward_param = set_reward_params(feature_dim, args.group_num)
     if args.wandb_use:
         wandb.config["true_reward_params"] = reward_param
        
@@ -240,8 +250,18 @@ def get_data(args, env):
             weights,
             uniform_policy,
             deterministic_ratio_list=args.deterministic_ratio_list,
+
         )
-    
+
+    # Test Data
+    test_data = collect_group_preference_data(
+         num=args.num_trials_for_eval,
+         env=env,
+         weights=test_weights,
+         policy_func=uniform_policy,
+         deterministic=True,
+    )
+
     # Val Data
     if args.use_uneven_grp_val:
         val_data = collect_uneven_group_preference_data_partial_deterministic_list(
@@ -259,15 +279,6 @@ def get_data(args, env):
             uniform_policy,
             deterministic_ratio_list=args.val_deterministic_ratio_list,
         )
-
-    # Test Data
-    test_data = collect_group_preference_data(
-        num=args.num_trials_for_eval,
-        env=env,
-        weights=test_weights,
-        policy_func=uniform_policy,
-        deterministic=True,
-    )
 
     return train_data, val_data, test_data
 
@@ -429,7 +440,7 @@ def log_final_results(args, logger, env, agent, reward, feature_func, test_data)
                 d_wandb[key] = e
         wandb.log(d_wandb)
 
-def save_results(args, rew_error, rew_dict):
+def save_results(args, rew_error, reward):
     rew_err_dict = {args.pref_data_num: rew_error}
     rew_dict = {args.pref_data_num: reward}
     

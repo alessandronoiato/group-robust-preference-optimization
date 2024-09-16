@@ -248,7 +248,7 @@ def collect_group_preference_data_partial_deterministic_list(
     pref_dataset = []
     action_num = env.action_num
     group_num = env.group_num
-    group_counts = np.round(np.array(weights) * num).astype(int)
+    group_counts = np.ceil(np.array(weights) * num).astype(int)
     group_ids = [i for i, count in enumerate(group_counts) for _ in range(count)]
     np.random.shuffle(group_ids)
     group_ids = group_ids[:num]
@@ -292,7 +292,7 @@ def collect_uneven_group_preference_data_partial_deterministic_list(
     group_id_1 = 0
     group_id_2 = 0
 
-    group_counts = np.round(np.array(weights) * num).astype(int)
+    group_counts = np.ceil(np.array(weights) * num).astype(int)
     group_ids = [i for i, count in enumerate(group_counts) for _ in range(count)]
     np.random.shuffle(group_ids)
     group_ids = group_ids[:num]
@@ -341,7 +341,9 @@ def collect_uneven_group_preference_data_partial_deterministic_list(
         # pref= 0 if reward_one>reward_two else 1
         group_transition = GroupTransition(state, action_one, action_two, group_id, reward_one, reward_two, pref)
         pref_dataset.append(group_transition)
-    print(group_id_1, group_id_2)
+    # print(group_id_1, group_id_2)
+    unique, counts = np.unique(group_ids, return_counts=True)
+    print(f"WEIGHTS: {weights} COUNTS: {counts}")
     print(crt_count / group_counts * 100, "crt_data")
     return pref_dataset
 
