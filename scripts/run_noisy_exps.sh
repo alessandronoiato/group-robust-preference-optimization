@@ -43,7 +43,7 @@ TIMESTAMP=$(date +'%Y_%m_%d_%H_%M_%S')
 SEEDS=(2021 2022 2023 2024 2025 2026 2027 2028 2029 2030) # (2024 2025 2026 2027 2028 2029 2030) # (2021 2022 2023 2024 2025)
 
 # Noise levels (deterministic_ratio_list)
-NOISE_LEVELS=("1.0") # ("1.0" "0.9" "0.8" "0.7" "0.6")
+NOISE_LEVELS=("0.6") # ("1.0" "0.9" "0.8" "0.7" "0.6")
 
 # Feature types
 FEATURE_TYPES=("swapped") # ("same" "flipped" "swapped")
@@ -60,7 +60,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
     for FEATURE_TYPE in "${FEATURE_TYPES[@]}"; do
         for NOISE_LEVEL in "${NOISE_LEVELS[@]}"; do
 
-	    DETERMINISTIC_RATIO_LIST="[1,1,1]" # "[1,1,1]" # Change when group_num changes
+	    DETERMINISTIC_RATIO_LIST="[1,${NOISE_LEVEL},1]" # "[1,1,1]" # Change when group_num changes
 	    VAL_DETERMINISTIC_RATIO_LIST="[1,1,1]" # "[1,1,1]" # Change when group_num changes
                 
             for SEED in "${SEEDS[@]}"; do
