@@ -19,7 +19,7 @@ WEIGHTED_BATCHES='false'
 EXP_ADAPTIVE=0
 RDPO_ADJ='0'
 EVAL_METRIC='argmax'
-IMPORTANCE_SAMPLING='False'
+IMPORTANCE_SAMPLING='True'
 IMPORTANCE_SAMPLING_WEIGHTS='None'
 IPO_GRAD_TYPE='justdpo'
 PARAM_LIMIT=5
@@ -43,7 +43,7 @@ TIMESTAMP=$(date +'%Y_%m_%d_%H_%M_%S')
 SEEDS=(2021 2022 2023 2024 2025 2026 2027 2028 2029 2030) # (2024 2025 2026 2027 2028 2029 2030) # (2021 2022 2023 2024 2025)
 
 # Noise levels (deterministic_ratio_list)
-NOISE_LEVELS=("0.6") # ("1.0" "0.9" "0.8" "0.7" "0.6")
+NOISE_LEVELS=("1.0" "0.9" "0.8" "0.7" "0.6") # ("1.0" "0.9" "0.8" "0.7" "0.6")
 
 # Feature types
 FEATURE_TYPES=("swapped") # ("same" "flipped" "swapped")
@@ -68,6 +68,8 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
 		SUB_LOG_DIR="${META_LOG_DIR}/${FEATURE_TYPE}_noise${NOISE_LEVEL}_${DETERMINISTIC_RATIO_LIST}_${SEED}"
                 mkdir -p "$SUB_LOG_DIR"
 		mkdir -p "$SUB_LOG_DIR/log"
+
+		WANDB_NAME="${DPO_TYPE},${STEP_SIZE},${REG_COEF},${EXP_STEP_SIZE},${DETERMINISTIC_RATIO_LIST},${SEED},IS=${IMPORTANCE_SAMPLING}" 
 		
 		python -m experiments.run_glb_noisy \
                 --mle_adaptive \
@@ -108,7 +110,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
                 --use_theory ${USE_THEORY} \
 		--wandb_project ${WANDB_PROJECT} \
 		--wandb_logdir "${SUB_LOG_DIR}/log" \
-		--wandb_name "${DPO_TYPE},${STEP_SIZE},${REG_COEF},${EXP_STEP_SIZE},${DETERMINISTIC_RATIO_LIST},${SEED}" \
+		--wandb_name "${WANDB_NAME}" \
                 --chi ${CHI}
             done
         done
