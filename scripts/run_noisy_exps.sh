@@ -8,12 +8,12 @@ ACTION_NUM=8
 GROUP_NUM=3
 PREF_DATA_NUM=300
 BATCH_SIZE=300
-DPO_NUM_ITERS=20000
+DPO_NUM_ITERS=200
 
 # Default values
 VAL_DETERMINISTIC='True'
 STEP_SIZE=0.1 # 0.1
-REG_COEF=1.0
+REG_COEF=0.1
 EXP_STEP_SIZE=0.01
 WEIGHTED_BATCHES='false'
 EXP_ADAPTIVE=0
@@ -21,18 +21,19 @@ RDPO_ADJ='0'
 EVAL_METRIC='argmax'
 IMPORTANCE_SAMPLING='False'
 IMPORTANCE_SAMPLING_WEIGHTS='None'
-IPO_GRAD_TYPE='justdpo'
+IPO_GRAD_TYPE='linear'
 PARAM_LIMIT=5
-USE_CLOSED_FORM='False'
+USE_CLOSED_FORM='True'
 LAMBA=0
 L2_REG_RDPO=0
 USE_UNEVEN_GRP='True' # 'False'
 USE_UNEVEN_GRP_VAL='True'
-USE_THEORY='False'
+USE_THEORY='True'
 WEIGHTS="[1,1,0.4]" # "[1,1,1]"
 VAL_WEIGHTS="[1,1,1]" # "[1,1,1]"
 TEST_WEIGHTS="[1,1,1]" # "[1,1,1]"
-WANDB_PROJECT="noisy_exp"
+WANDB_ENTITY="group-robustness-noisy-labels"
+WANDB_PROJECT="common-good-ipo"
 WANDB_GROUP='group_3_exp'
 CHI=1
 
@@ -43,13 +44,13 @@ TIMESTAMP=$(date +'%Y_%m_%d_%H_%M_%S')
 SEEDS=(2021 2022 2023 2024 2025 2026 2027 2028 2029 2030) # (2024 2025 2026 2027 2028 2029 2030) # (2021 2022 2023 2024 2025)
 
 # Noise levels (deterministic_ratio_list)
-NOISE_LEVELS=("1.0") # ("1.0" "0.9" "0.8" "0.7" "0.6")
+NOISE_LEVELS=("1.0" "0.9" "0.8" "0.7" "0.6")
 
 # Feature types
 FEATURE_TYPES=("swapped") # ("same" "flipped" "swapped")
 
 # DPO types
-DPO_TYPES=("rdpo") # ("dpo" "rdpo")
+DPO_TYPES=("dpo" "rdpo") # ("dpo" "rdpo")
 
 # Main loop
 for DPO_TYPE in "${DPO_TYPES[@]}"; do
@@ -60,7 +61,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
     for FEATURE_TYPE in "${FEATURE_TYPES[@]}"; do
         for NOISE_LEVEL in "${NOISE_LEVELS[@]}"; do
 
-	    DETERMINISTIC_RATIO_LIST="[1,1,1]" # "[1,1,1]" # Change when group_num changes
+	    DETERMINISTIC_RATIO_LIST="[1,$NOISE_LEVEL,1]" # "[1,1,1]" # Change when group_num changes
 	    VAL_DETERMINISTIC_RATIO_LIST="[1,1,1]" # "[1,1,1]" # Change when group_num changes
                 
             for SEED in "${SEEDS[@]}"; do
@@ -106,6 +107,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
                 --use_uneven_grp ${USE_UNEVEN_GRP} \
                 --use_uneven_grp_val ${USE_UNEVEN_GRP_VAL} \
                 --use_theory ${USE_THEORY} \
+                --wandb_entity ${WANDB_ENTITY} \
 		--wandb_project ${WANDB_PROJECT} \
 		--wandb_logdir "${SUB_LOG_DIR}/log" \
 		--wandb_name "${DPO_TYPE},${STEP_SIZE},${REG_COEF},${EXP_STEP_SIZE},${DETERMINISTIC_RATIO_LIST},${SEED}" \

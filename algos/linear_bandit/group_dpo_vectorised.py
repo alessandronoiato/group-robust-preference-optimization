@@ -846,7 +846,7 @@ class GroupDirectPolicyOptimizationVectorised:
             grad_norm = self.update_once(dataset)
             if step % self.report_iter == 0:
                 print("UPDATE PARAM GroupDPO: ", self.theta_update)
-                print("TOTAL LOSS GroupDPO: ", self.total_loss)
+                print("TOTAL LOSS GroupDPO: ", sum(self.group_loss))
 
                 if self.ipo_grad_type == "justdpo":
                     train_loss = self.evaluate_loss(dataset)

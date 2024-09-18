@@ -1,0 +1,208 @@
+wandb_version: 1
+
+env:
+  desc: null
+  value: group_linear_bandit
+state_dim:
+  desc: null
+  value: 2
+action_num:
+  desc: null
+  value: 8
+group_num:
+  desc: null
+  value: 3
+feature_type:
+  desc: null
+  value: swapped
+log_dir:
+  desc: null
+  value: log_rdpo/2024_09_18_21_50_05/swapped_noise0.8_[1,0.8,1]_2027
+seed:
+  desc: null
+  value: 2027
+pref_data_num:
+  desc: null
+  value: 300
+val_data_num:
+  desc: null
+  value: 50
+num_trials_for_eval:
+  desc: null
+  value: 1000
+agent:
+  desc: null
+  value: pg
+dpo_type:
+  desc: null
+  value: rdpo
+reg_coef:
+  desc: null
+  value: 0.1
+dpo_num_iters:
+  desc: null
+  value: 100
+dpo_step_size:
+  desc: null
+  value: 0.1
+dpo_adaptive:
+  desc: null
+  value: false
+dpo_ada_coef:
+  desc: null
+  value: 1.0
+rdpo_batch_size:
+  desc: null
+  value: 300
+rdpo_exp_step_size:
+  desc: null
+  value: 0.01
+rdpo_weighted_batches:
+  desc: null
+  value: false
+rdpo_adj:
+  desc: null
+  value: '0'
+exp_adaptive:
+  desc: null
+  value: 0.0
+deterministic_ratio_list:
+  desc: null
+  value:
+  - 1.0
+  - 0.8
+  - 1.0
+val_deterministic:
+  desc: null
+  value: true
+val_deterministic_ratio_list:
+  desc: null
+  value:
+  - 1.0
+  - 1.0
+  - 1.0
+weights:
+  desc: null
+  value: '[1,1,0.4]'
+val_weights:
+  desc: null
+  value: '[1,1,1]'
+test_weights:
+  desc: null
+  value: '[1,1,1]'
+mle_num_iters:
+  desc: null
+  value: 100
+mle_adaptive:
+  desc: null
+  value: true
+mle_ada_coef:
+  desc: null
+  value: 1.0
+mle_step_size:
+  desc: null
+  value: 0.1
+wandb_logdir:
+  desc: null
+  value: log_rdpo/2024_09_18_21_50_05/swapped_noise0.8_[1,0.8,1]_2027/log
+eval_metric:
+  desc: null
+  value: argmax
+eval_metric_prob:
+  desc: null
+  value: KL
+importance_sampling:
+  desc: null
+  value: false
+importance_sampling_weights:
+  desc: null
+  value: None
+ipo_grad_type:
+  desc: null
+  value: linear
+param_limit:
+  desc: null
+  value: 5
+use_closed_form:
+  desc: null
+  value: true
+lamba:
+  desc: null
+  value: 0.0
+l2_reg_rdpo:
+  desc: null
+  value: 0.0
+use_weight_val:
+  desc: null
+  value: false
+use_uneven_grp:
+  desc: null
+  value: true
+use_uneven_grp_val:
+  desc: null
+  value: true
+use_theory:
+  desc: null
+  value: true
+chi:
+  desc: null
+  value: 1.0
+wandb_use:
+  desc: null
+  value: true
+wandb_key:
+  desc: null
+  value: fbf79a31d3c4d52eaf326308d880d3ebca26b10d
+wandb_entity:
+  desc: null
+  value: group-robustness-noisy-labels
+wandb_project:
+  desc: null
+  value: common-good-ipo
+wandb_group:
+  desc: null
+  value: group_3_exp
+wandb_name:
+  desc: null
+  value: rdpo,0.1,0.1,0.01,[1,0.8,1],2027
+_wandb:
+  desc: null
+  value:
+    python_version: 3.11.8
+    cli_version: 0.17.9
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1726690472
+    t:
+      1:
+      - 55
+      2:
+      - 55
+      3:
+      - 2
+      - 13
+      - 15
+      - 16
+      - 19
+      - 23
+      4: 3.11.8
+      5: 0.17.9
+      8:
+      - 4
+      - 5
+      13: darwin-arm64
+true_reward_params:
+  desc: null
+  value:
+  - - 1.0
+    - 3.0
+    - 1.0
+    - 3.0
+  - - 3.0
+    - 1.0
+    - 3.0
+    - 1.0
+  - - 1.5
+    - 2.5
+    - 1.5
+    - 2.5

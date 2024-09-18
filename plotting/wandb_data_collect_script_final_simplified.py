@@ -10,8 +10,8 @@ from visualisations_utils_wandb_api import download_runs, group_process_runs, pr
 neatplot.set_style()
 
 # Constants and configurations
-ENTITY = "robust-rl-project"
-PROJECT = "bandits_dpo"
+ENTITY = "group-robustness-noisy-labels"
+PROJECT = "common-good-ipo"
 REWARD_FUNC = "flipped"  # in {'swapped', 'flipped', 'same'}
 SETTINGS = {
     "even_imbalanced_ipo": [

@@ -10,8 +10,8 @@ from visualisations_utils_wandb_api import download_runs, group_process_runs, pr
 neatplot.set_style()
 
 # Constants and configurations
-ENTITY = "robust-rl-project"
-PROJECT = "bandits_dpo"
+ENTITY = "group-robustness-noisy-labels"
+PROJECT = "common-good-ipo"
 REWARD_FUNC = "flipped"  # in {'swapped', 'flipped', 'same'}
 SETTINGS = {
     "even_imbalanced_ipo": [
@@ -229,9 +229,9 @@ def plot_metric_with_error_bands(
     # plt.figure(figsize=(12, 6))
     ##for i, (avg, sem) in enumerate(zip(metric_values, metric_sem)):
     for avg, sem, label in zip(metric_values, metric_sem, labels):
-        if extend and len(avg) != len(iteration_index):
-            avg = np.append(avg, [avg[-1]] * (len(iteration_index) - len(avg)))
-            sem = np.append(sem, [sem[-1]] * (len(iteration_index) - len(sem)))
+        if extend and len(avg) != iteration_index:
+            avg = np.append(avg, [avg[-1]] * (iteration_index - len(avg)))
+            sem = np.append(sem, [sem[-1]] * (iteration_index - len(sem)))
         # color = colors[i] if colors else None
         if label in {"GR-DPO", "GR-IPO"}:
             legend_label = r"$\textbf{" + label + "}$"

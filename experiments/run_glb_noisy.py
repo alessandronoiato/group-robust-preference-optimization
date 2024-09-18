@@ -140,9 +140,9 @@ def parse_args():
 
     # Wandb args
     parser.add_argument("--wandb_use", action="store_true")
-    parser.add_argument("--wandb_key", type=str, default="cd7b1433bad4eb38b457b881d01b17040a0b2432")
-    parser.add_argument("--wandb_entity", type=str, default="robust-rl-project")
-    parser.add_argument("--wandb_project", type=str, default="bandits_dpo")
+    parser.add_argument("--wandb_key", type=str, default="fbf79a31d3c4d52eaf326308d880d3ebca26b10d")
+    parser.add_argument("--wandb_entity", type=str, default="group-robustness-noisy-labels")
+    parser.add_argument("--wandb_project", type=str, default="common-good-ipo")
     parser.add_argument("--wandb_group", type=str, default="group1")
     parser.add_argument("--wandb_name", type=str, default="linear_bandits")
 
@@ -178,6 +178,7 @@ def setup_wandb(args):
     wandb_group = f"state_dim{args.state_dim}action_num={args.action_num}group_num{args.group_num}pref_data_num{args.pref_data_num}weights={args.weights}feature_type{args.feature_type}eval_metric{args.eval_metric}{args.wandb_group}"
 
     wandb.init(
+        entity=args.wandb_entity,
         group=wandb_group,
         project=args.wandb_project,
         config=args.__dict__,
