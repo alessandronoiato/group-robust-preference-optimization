@@ -1,6 +1,6 @@
 # Logs
-logs_dpo/
-logs_rdpo/
+log_dpo/
+log_rdpo/
 
 # Plots
 plot/
