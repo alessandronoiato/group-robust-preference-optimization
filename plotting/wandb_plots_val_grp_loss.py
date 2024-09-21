@@ -19,7 +19,7 @@ plt.rcParams.update({'font.size': 16})  # Increase the default font size
 def plot_loss(data_dict, noise_level, title, xlabel, ylabel, filename):
     fig, ax = plt.subplots(figsize=(14, 8))
     
-    map_ = {'dpo': 'DPO', 'rdpo': 'GR-DPO'}
+    map_ = {'dpo': 'IPO', 'rdpo': 'GR-IPO'}
     for method in ['dpo', 'rdpo']:
         # Combine all dataframes for this method and noise level
         all_dfs = list(data_dict[method][noise_level].values())

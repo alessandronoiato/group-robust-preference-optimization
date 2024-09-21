@@ -1286,6 +1286,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         if self.importance_sampling == True:
             self.weighted_batches = False
             if self.importance_sampling_weights:
+                print("IMPORTANCE SAMPLING WEIGHTS: ", self.importance_sampling_weights)
                 # process generalization adjustment stuff
                 imp_weights = [float(c) for c in self.importance_sampling_weights.split(",")]
                 assert len(imp_weights) == self.group_num
