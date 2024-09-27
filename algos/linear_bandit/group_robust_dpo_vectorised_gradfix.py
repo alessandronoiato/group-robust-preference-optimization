@@ -1262,8 +1262,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         env: GroupLinearBandit,
         optimal_reward: List[float],
     ) -> float:
-        print(self.ipo_grad_type)
-        # print(dataset)
         ratio = int(len(dataset) / self.batch_size)
         # Collect unique group IDs using set comprehension
         unique_group_ids = {transition.group_id for transition in dataset}
@@ -1273,7 +1271,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
         # Iterate through the transitions and count occurrences
         for group_transition in dataset:
-            print(group_transition)
             group_counts[group_transition.group_id] += 1
 
         # Sort the dictionary items by group_id

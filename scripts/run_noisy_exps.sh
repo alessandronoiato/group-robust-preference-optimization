@@ -26,8 +26,8 @@ PARAM_LIMIT=5
 USE_CLOSED_FORM='False'
 LAMBA=0
 L2_REG_RDPO=0
-USE_UNEVEN_GRP='True' # 'False'
-USE_UNEVEN_GRP_VAL='True'
+USE_UNEVEN_GRP='False' # 'False'
+USE_UNEVEN_GRP_VAL='False'
 USE_THEORY='False'
 WEIGHTS="[1,1,0.4]" # "[1,1,1]"
 VAL_WEIGHTS="[1,1,1]" # "[1,1,1]"
@@ -43,7 +43,7 @@ TIMESTAMP=$(date +'%Y_%m_%d_%H_%M_%S')
 SEEDS=(2021 2022 2023 2024 2025 2026 2027 2028 2029 2030) # (2024 2025 2026 2027 2028 2029 2030) # (2021 2022 2023 2024 2025)
 
 # Noise levels (deterministic_ratio_list)
-NOISE_LEVELS=("1.0" "0.9" "0.8" "0.7" "0.6") # ("1.0" "0.9" "0.8" "0.7" "0.6")
+NOISE_LEVELS=("1.0" "0.9" "0.8" "0.7" "0.6")
 
 # Feature types
 FEATURE_TYPES=("swapped") # ("same" "flipped" "swapped")

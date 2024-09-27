@@ -299,6 +299,7 @@ def main(args):
         # pref_data = collect_group_preference_data_partial_deterministic_list(args.pref_data_num, env, weights, uniform_policy,deterministic_ratio_list=args.deterministic_ratio_list)
         pref_data = collect_group_preference_data(args.pref_data_num, env, weights, uniform_policy, deterministic=True)
     # weight_val_pref = collect_group_preference_data(args.val_data_num, env, val_weights, uniform_policy,deterministic=True)
+    print(f"WEIGHTS: {weights}")
     test_pref = collect_group_preference_data(
         args.num_trials_for_eval, env, test_weights, uniform_policy, deterministic=True
     )
@@ -318,6 +319,7 @@ def main(args):
             uniform_policy,
             deterministic_ratio_list=args.val_deterministic_ratio_list,
         )
+    breakpoint()
 
     opt_reward = env.evaluate_reward_group_wise(policy=opt_policy, states=test_pref)
 
