@@ -30,7 +30,7 @@ class CommonGradientDescent:
         wandb_use: bool = False,  ## recording results in WandB
         param_limit: int = 1,  ## elements of vector θ range in [0, param_limit]
         report_iter: int = 2000,  ## log metrics after these iters
-        seed: int = None, ## Seed
+        seed: int = None,  ## Seed
     ) -> None:
         print(f"RUNNING CGD STEP_SIZE={step_size} C={C} REG_COEG={reg_coef} SEED={seed}")
         self.state_dim = state_dim
@@ -353,7 +353,7 @@ class CommonGradientDescent:
             for lj in range(self.group_num):
                 cos_sim = (all_grads[lj] @ all_grads[li]) / t.clamp(
                     (t.norm(all_grads[lj]) * t.norm(all_grads[li])), min=1e-3
-                ) 
+                )
                 RTG[li][lj] = cos_sim
 
         # Gradient scaling - Appendix A
