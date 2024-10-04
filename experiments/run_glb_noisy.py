@@ -112,7 +112,7 @@ def parse_args():
     parser.add_argument("--exp_adaptive", type=float, default=0.0)
 
     # CGD args
-    parser.add_argument("--C", type=float, default=0)
+    parser.add_argument("--C", type=float)
 
     # Data args
     parser.add_argument("--deterministic_ratio_list", type=float_list, default="[0,0]")
@@ -179,10 +179,7 @@ def setup_wandb(args):
         ]
 
     # Experiment Name
-    if args.dpo_type == "dpo":
-        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.seed}"
-    else:
-        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.rdpo_exp_step_size}_{args.rdpo_batch_size}_{args.rdpo_weighted_batches}_{args.rdpo_adj}_{args.deterministic_ratio_list}_{args.seed}"
+    exp_name = f"{args.wandb_name}_{args.seed}"
 
     # Group
     wandb_group = f"state_dim{args.state_dim}action_num={args.action_num}group_num{args.group_num}pref_data_num{args.pref_data_num}weights={args.weights}feature_type{args.feature_type}eval_metric{args.eval_metric}{args.wandb_group}"
@@ -396,6 +393,7 @@ def get_agent(args, logger, feature_dim, feature_func):
             wandb_use=args.wandb_use,
             param_limit=args.param_limit,
             report_iter=100,
+            seed=args.seed,
         )
     else:
         raise ValueError(f"Unknown DPO type: {args.dpo_type}")

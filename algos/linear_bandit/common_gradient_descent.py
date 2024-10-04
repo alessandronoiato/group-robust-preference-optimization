@@ -30,7 +30,9 @@ class CommonGradientDescent:
         wandb_use: bool = False,  ## recording results in WandB
         param_limit: int = 1,  ## elements of vector θ range in [0, param_limit]
         report_iter: int = 2000,  ## log metrics after these iters
+        seed: int = None, ## Seed
     ) -> None:
+        print(f"RUNNING CGD STEP_SIZE={step_size} C={C} REG_COEG={reg_coef} SEED={seed}")
         self.state_dim = state_dim
         self.action_num = action_num
         self.group_num = group_num
@@ -46,6 +48,10 @@ class CommonGradientDescent:
         self.wandb_use = wandb_use
         self.param_limit = param_limit
         self.report_iter = report_iter
+        self.seed = seed
+
+        if seed is not None:
+            t.manual_seed(seed)
 
         self.np_float = np.float32
         self.t_float = t.float32
@@ -312,6 +318,11 @@ class CommonGradientDescent:
                 for i, g in enumerate(grad.tolist()):
                     wandb_dict[f"grad_{i+1}"] = g
 
+                # Log RTG for each group
+                rtg_sum = t.sum(self.RTG, dim=1)
+                for grp in range(self.group_num):
+                    wandb_dict[f"relative_transfer_gain_{grp+1}"] = rtg_sum[grp].item()
+
                 wandb.log(wandb_dict)
 
             if self.logger:
@@ -342,12 +353,13 @@ class CommonGradientDescent:
             for lj in range(self.group_num):
                 cos_sim = (all_grads[lj] @ all_grads[li]) / t.clamp(
                     (t.norm(all_grads[lj]) * t.norm(all_grads[li])), min=1e-3
-                )
+                ) 
                 RTG[li][lj] = cos_sim
 
         # Gradient scaling - Appendix A
         _gl = t.sqrt(group_losses.detach().unsqueeze(-1))
         RTG = t.mm(_gl, _gl.t()) * RTG
+        self.RTG = RTG
 
         _exp = self.step_size * (RTG @ self.initial_group_weights)
         _exp -= _exp.max()  # To avoid overflow
