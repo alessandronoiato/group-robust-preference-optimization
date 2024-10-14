@@ -46,6 +46,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         train_agent: bool = True,  ## if True, use self.train(); else, use self.random_train() func
         report_iter: int = 2000,  ## log metrics after these iters
     ) -> None:
+        print(f"{ipo_grad_type=}")
         self.state_dim = state_dim
         self.action_num = action_num
         self.feature_dim = feature_dim
@@ -358,7 +359,24 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         ######################################################################################
         ################### VECTORISED REDEFINITION across all transitions ###################
         ######################################################################################
-        if self.ipo_grad_type == "justdpo":
+        if self.ipo_grad_type == "noisy_dpo":
+            log_ratio_diff_all = (
+                self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
+            )
+            sigmoid_pos = sigmoid(log_ratio_diff_all)
+            sigmoid_neg = sigmoid(-log_ratio_diff_all)
+
+            coef = np.zeros_like(log_ratio_diff_all)
+
+            for group_id in range(self.group_num):
+                nl = self.noise_level[group_id]
+                group_indices = group_id_idx_all[group_id]
+
+                group_loss[group_id] = (((1 - nl) * np.sum(-np.log(sigmoid_pos[group_indices]))) - (nl * np.sum(-np.log(sigmoid_neg[group_indices])))) / (1 - 2*nl) + self.adj[group_id] / np.sqrt(self.group_counts[group_id])
+
+                coef[group_indices] = ((1-nl)*sigmoid_neg[group_indices] + nl*sigmoid_pos[group_indices]) / (1-2*nl)
+           
+        elif self.ipo_grad_type == "justdpo":
             log_ratio_diff_all = (
                 self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
             )  # log_ratio_diff_all shape (len(dataset),1)
@@ -449,7 +467,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 )  # / cur_group_counts # regularisation L2
                 weighted_group_grad[g] += (
                     2 * self.l2_reg_rdpo * self.param
-                )  # * self.group_weights[g] #/ cur_group_counts[g]
+                ) # * self.group_weights[g] #/ cur_group_counts[g]
         elif self.reg_by_group_weights != 0:
             group_loss -= self.reg_by_group_weights * np.square(self.group_weights)  # Paper Theorem 3.1
             # grad is invariant to this negative term, so no update
@@ -1060,7 +1078,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         # VECTORISATION for log_ratio_diff
         log_ratio_diff = self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
         loss = np.sum(-np.log(sigmoid(log_ratio_diff))) / len(dataset)
-        loss /= len(dataset)
 
         if self.l2_reg_rdpo != 0:
             loss += self.l2_reg_rdpo * np.square(np.linalg.norm(self.param))  # / len(dataset) # regularisation L2
@@ -1261,7 +1278,37 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         test_dataset: list[GroupTransition],
         env: GroupLinearBandit,
         optimal_reward: List[float],
-    ) -> float:
+    ) -> float:        
+        self.noise_level = [0 for _ in range(self.group_num)]
+        group_counts = defaultdict(int)
+
+        print(f"{env.reward_param=}")
+        for idx, transition in enumerate(dataset):
+            state, action_one, action_two, group_id, pref = (
+                transition.state,
+                transition.action_0,
+                transition.action_1,
+                transition.group_id,
+                transition.pref,
+            )
+
+            env.cur_state = state
+            reward_one, reward_two = env.sample(action_one, group_id), env.sample(action_two, group_id)
+
+            expected_pref = 0 if reward_one > reward_two else 1
+
+            if expected_pref != pref:
+                self.noise_level[group_id] += 1
+
+            group_counts[group_id] += 1
+
+        print(f"NOISE LEVEL PRE: {self.noise_level}")
+        for grp in range(self.group_num):
+            self.noise_level[grp] /= group_counts[grp]
+
+        print(f"GROUP COUNTS: {group_counts}")
+        print(f"NOISE LEVEL: {self.noise_level}")
+
         ratio = int(len(dataset) / self.batch_size)
         # Collect unique group IDs using set comprehension
         unique_group_ids = {transition.group_id for transition in dataset}
@@ -1293,110 +1340,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 self.group_weights = self.group_weights / np.sum(self.group_weights)
         self.logger.info(f"unique_group_ids: {unique_group_ids}")
 
-        """
-        step=-1
-        
-        if self.ipo_grad_type=='justdpo':
-            train_loss = self.evaluate_loss(dataset)
-            val_loss = self.evaluate_loss(val_dataset)
-            train_wt_loss = self.evaluate_weighted_loss(dataset)
-            val_wt_loss = self.evaluate_weighted_loss(val_dataset)
-            train_grp_loss = self.evaluate_grp_loss(dataset)
-            val_grp_loss = self.evaluate_grp_loss(val_dataset)
-            grad_norm=self.evaluate_grad(dataset)
-            live_grad=grad_norm
-        else:
-            train_loss = self.evaluate_ipo_loss(dataset)
-            val_loss = self.evaluate_ipo_loss(val_dataset)
-            train_wt_loss = self.evaluate_weighted_ipo_loss(dataset)
-            val_wt_loss = self.evaluate_weighted_ipo_loss(val_dataset)
-            train_grp_loss = self.evaluate_ipo_grp_loss(dataset)
-            val_grp_loss = self.evaluate_ipo_grp_loss(val_dataset)
-            grad_norm=self.evaluate_ipo_grad(dataset)
-            live_grad=grad_norm
-           
-        self.group_loss=train_grp_loss
-        kl_dist=self.evaluate_KL(env=env,states=test_dataset)
-                        
-        #Evaluate the reward on the test dataset:
-        #rew = self.evaluate_reward(env=env, 
-        #                           states=test_dataset)
-        rew_err = [float(a - b)/a for a, b in zip(optimal_reward,self.evaluate_reward(env=env, 
-                                    states=test_dataset) )]
-        formatted_rew=", ".join([f"{reward:.4f}" for reward in rew_err])
-
-        formatted_kl=", ".join([f"{kld:.4f}" for kld in kl_dist])
-
-        max_reward_err=max(rew_err)
-        max_reward_err_index=rew_err.index(max_reward_err)
-
-        max_kl_dist=max(kl_dist)
-        max_kl_dist_index=kl_dist.index(max_kl_dist)
-
-        max_train_grp_loss=np.max(train_grp_loss)
-        max_val_grp_loss=np.max(val_grp_loss)
-        max_cur_train_grp_loss=np.max(self.group_loss)
-        max_train_grp_loss_index=np.argmax(train_grp_loss)
-        max_val_grp_loss_index=np.argmax(val_grp_loss)
-        max_cur_train_grp_loss_index=np.argmax(self.group_loss)
-
-
-        logging_str = (f"Iteration: {step: d}, train_loss: {train_loss: .4f}, "
-                    f"val_loss: {val_loss: .4f}, grad_norm: {grad_norm:.4f}, live_grad: {live_grad:.4f}, "
-                    f"reward_err: {formatted_rew}, KL_dist: {formatted_kl}, param: {self.param}, weights: {self.group_weights}, "
-                    f"train_wt_loss: {train_wt_loss: .4f}, val_wt_loss: {val_wt_loss:.4f}, "
-                    f"train_grp_loss: {train_grp_loss}, val_grp_loss: {val_grp_loss}, "
-                    f"train_hist_grp_loss: {self.hist_group_loss}, cur_train_grp_loss: {self.group_loss}, "
-                    f"max_reward_err: {max_reward_err: .4f}, max_reward_err_index: {max_reward_err_index}, "
-                    f"max_kl_dist: {max_kl_dist: .4f}, max_kl_dist_index: {max_kl_dist_index}, "
-                    f"max_train_grp_loss: {max_train_grp_loss: .4f}, max_train_grp_loss_index: {max_train_grp_loss_index}, "
-                    f"max_val_grp_loss: {max_val_grp_loss: .4f}, max_val_grp_loss_index: {max_val_grp_loss_index}, "
-                    f"max_cur_train_grp_loss: {max_cur_train_grp_loss: .4f}, max_cur_train_grp_loss_index: {max_cur_train_grp_loss_index}, ")
-        if self.wandb_use:
-            d_wandb = {
-                "Iteration": step, "train_loss": train_loss, 
-                    "val_loss": val_loss, "grad_norm": grad_norm, "live_grad": live_grad, 
-                    "train_weighted_loss": train_wt_loss, "val_weighted_loss": val_wt_loss,
-                    "max_reward_err": max_reward_err , "max_reward_err_index": max_reward_err_index, 
-                    "max_kl_dist" : max_kl_dist, "max_kl_dist_index": max_kl_dist_index, 
-                    "max_train_grp_loss": max_train_grp_loss, "max_train_grp_loss_index": max_train_grp_loss_index, 
-                    "max_val_grp_loss": max_val_grp_loss, "max_val_grp_loss_index": max_val_grp_loss_index, 
-                    "max_cur_train_grp_loss": max_cur_train_grp_loss, "max_cur_train_grp_loss_index": max_cur_train_grp_loss_index
-            }
-            # Assuming rew_err is a list
-            for i, err in enumerate(rew_err):
-                key = f"reward_err_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                d_wandb[key] = err
-            for i, kld in enumerate(kl_dist):
-                key = f"KL_distance_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                d_wandb[key] = kld
-            for i, param in enumerate(self.param):
-                key = f"reward_param_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                d_wandb[key] = param      
-            for i, grp_wt in enumerate(self.group_weights):
-                key = f"group_weight_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                d_wandb[key] = grp_wt 
-            for i, hist_grp_ls in enumerate(self.hist_group_loss):
-                key = f"hist_group_loss_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                d_wandb[key] = hist_grp_ls 
-            for i, grp_ls in enumerate(self.group_loss):
-                key = f"cur_group_loss_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                d_wandb[key] = grp_ls 
-            for i, grp_ls in enumerate(train_grp_loss):
-                key = f"train_group_loss_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                d_wandb[key] = grp_ls    
-            for i, grp_ls in enumerate(val_grp_loss):
-                key = f"val_group_loss_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                d_wandb[key] = grp_ls    
-            
-            wandb.log(d_wandb)
-        if self.logger:
-            self.logger.info(logging_str)
-        else:
-            print(logging_str)
-
-        """
-
         for step in range(ratio * self.num_iters):
             if self.use_closed_form:
                 grad_norm, live_grad = self.batch_update_closed_form(dataset, self.batch_size, unique_group_ids)
@@ -1406,21 +1349,21 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 print("UPDATE PARAM GroupRobustDPO: ", self.theta_update)
                 print("TOTAL LOSS GroupRobustDPO: ", self.total_loss)
 
-                if self.ipo_grad_type == "justdpo":
+                if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
                     train_loss = self.evaluate_loss(dataset)
                     val_loss = self.evaluate_loss(val_dataset)
                 else:
                     train_loss = self.evaluate_ipo_loss(dataset)
                     val_loss = self.evaluate_ipo_loss(val_dataset)
 
-                if self.ipo_grad_type == "justdpo":
+                if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
                     train_wt_loss = self.evaluate_weighted_loss(dataset)
                     val_wt_loss = self.evaluate_weighted_loss(val_dataset)
                 else:
                     train_wt_loss = self.evaluate_weighted_ipo_loss(dataset)
                     val_wt_loss = self.evaluate_weighted_ipo_loss(val_dataset)
 
-                if self.ipo_grad_type == "justdpo":
+                if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
                     train_grp_loss = self.evaluate_grp_loss(dataset)
                     val_grp_loss = self.evaluate_grp_loss(val_dataset)
                 else:
@@ -1429,9 +1372,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
                 kl_dist = self.evaluate_KL(env=env, states=test_dataset)
 
-                # Evaluate the reward on the test dataset:
-                # rew = self.evaluate_reward(env=env,
-                #                           states=test_dataset)
                 rew_err = [
                     float(a - b) / a for a, b in zip(optimal_reward, self.evaluate_reward(env=env, states=test_dataset))
                 ]
@@ -1520,21 +1460,21 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                     self.logger.info(logging_str)
                 else:
                     print(logging_str)
-        if self.ipo_grad_type == "justdpo":
+        if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
             train_loss = self.evaluate_loss(dataset)
             val_loss = self.evaluate_loss(val_dataset)
         else:
             train_loss = self.evaluate_ipo_loss(dataset)
             val_loss = self.evaluate_ipo_loss(val_dataset)
 
-        if self.ipo_grad_type == "justdpo":
+        if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
             train_wt_loss = self.evaluate_weighted_loss(dataset)
             val_wt_loss = self.evaluate_weighted_loss(val_dataset)
         else:
             train_wt_loss = self.evaluate_weighted_ipo_loss(dataset)
             val_wt_loss = self.evaluate_weighted_ipo_loss(val_dataset)
 
-        if self.ipo_grad_type == "justdpo":
+        if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
             train_grp_loss = self.evaluate_grp_loss(dataset)
             val_grp_loss = self.evaluate_grp_loss(val_dataset)
         else:
@@ -1545,9 +1485,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
         formatted_kl = ", ".join([f"{kld:.4f}" for kld in kl_dist])
 
-        # Evaluate the reward on the test dataset:
-        # rew = self.evaluate_reward(env=env,
-        #                           states=test_dataset)
         rew_err = [float(a - b) / a for a, b in zip(optimal_reward, self.evaluate_reward(env=env, states=test_dataset))]
         formatted_rew = ", ".join([f"{reward:.4f}" for reward in rew_err])
 

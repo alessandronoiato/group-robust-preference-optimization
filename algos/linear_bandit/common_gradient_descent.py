@@ -243,7 +243,7 @@ class CommonGradientDescent:
             val_wt_loss = self.evaluate_weighted_loss(val_dataset).item()
 
             train_grp_loss = self.evaluate_grp_loss(dataset).tolist()
-            val_grp_loss = self.evaluate_grp_loss(dataset).tolist()
+            val_grp_loss = self.evaluate_grp_loss(val_dataset).tolist()
 
             kl_dist = self.evaluate_KL(env, test_dataset)
             formatted_kl = ", ".join([f"{kld:.4f}" for kld in kl_dist])
@@ -320,8 +320,10 @@ class CommonGradientDescent:
 
                 # Log RTG for each group
                 rtg_sum = t.sum(self.RTG, dim=1)
-                for grp in range(self.group_num):
-                    wandb_dict[f"relative_transfer_gain_{grp+1}"] = rtg_sum[grp].item()
+                for grp_i in range(self.group_num):
+                    for grp_j in range(self.group_num):
+                        wandb_dict[f"rtg_{grp_i+1}_{grp_j+1}"] = self.RTG[grp_i][grp_j].item()
+                    wandb_dict[f"relative_transfer_gain_{grp_i+1}"] = rtg_sum[grp_i].item()
 
                 wandb.log(wandb_dict)
 

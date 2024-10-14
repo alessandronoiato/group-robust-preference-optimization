@@ -1,0 +1,59 @@
+state_dim: 2
+action_num: 8
+group_num: 3
+pref_data_num: 300
+batch_size: 300
+dpo_num_iters: 20000
+step_size: 0.1
+reg_coef: 1.0
+exp_step_size: 0.01
+eval_metric: 'argmax'
+param_limit: 5
+chi: 1
+C: 0
+
+reward_param: "[[2.0,2.0,2.0,2.0],[2.0,2.0,2.0,2.0],[2.0,2.0,2.0,2.0]]"
+weights: "[1,1,0.4]"
+val_weights: "[1,1,1]"
+test_weights: "[1,1,1]"
+
+weighted_batches: "False"
+exp_adaptive: 0
+rdpo_adj: '0'
+use_closed_form: "False"
+val_deterministic: "False"
+lamba: 0
+l2_reg_rdpo: 0
+use_uneven_grp: "False"
+use_uneven_grp_val: "False"
+use_theory: "False"
+importance_sampling_weights: 'None'
+
+wandb:
+  project: "simple_noisy"
+  group: 'group_exp'
+
+feature_types:
+  - "same"
+
+noise_levels:
+  - 1.0
+  - 0.9
+  - 0.8
+  - 0.7
+  - 0.6
+  - 0.5
+  - 0.4
+  - 0.3
+
+seeds:
+  - 2021
+  - 2022
+  - 2023
+  - 2024
+  - 2025
+  - 2026
+  - 2027
+  - 2028
+  - 2029
+  - 2030

@@ -147,6 +147,9 @@ def parse_args():
     parser.add_argument("--use_theory", type=lambda x: (str(x).lower() == "true"), default=False)
     parser.add_argument("--chi", type=float, default=1.0)
 
+    parser.add_argument('--reward_param', type=str, required=True,
+                        help='Reward parameters for each group. Format: "[[x,x,x,x],[y,y,y,y],[z,z,z,z]]"')
+
     # Wandb args
     parser.add_argument("--wandb_use", action="store_true")
     parser.add_argument("--wandb_key", type=str, default="cd7b1433bad4eb38b457b881d01b17040a0b2432")
@@ -219,7 +222,8 @@ def setup_environment(args):
         feature_type=args.feature_type,
     )
 
-    reward_param = set_reward_params(feature_dim, args.group_num)
+    # reward_param = set_reward_params(feature_dim, args.group_num)
+    reward_param = np.array(ast.literal_eval(args.reward_param), dtype=np.float32)
     if args.wandb_use:
         wandb.config["true_reward_params"] = reward_param
 
