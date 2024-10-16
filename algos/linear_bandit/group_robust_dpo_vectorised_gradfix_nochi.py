@@ -43,7 +43,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         l2_reg_rdpo: float = 0,  ## L2 regularisation for vectorised RDPO
         reg_by_group_weights: float = 0,  ## regularisation on vectorised RDPO by subtracting step*group_weights^2
         train_agent: bool = True,  ## if True, use self.train(); else, use self.random_train() func
-        report_iter: int = 2000,  ## log metrics after these iters
+        report_iter: int = 1,  ## log metrics after these iters
     ) -> None:
         self.state_dim = state_dim
         self.action_num = action_num

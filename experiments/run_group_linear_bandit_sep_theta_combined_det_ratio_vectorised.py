@@ -383,6 +383,7 @@ def main(args):
             group_num=group_num,
             feature_dim=feature_dim,
             feature_func=policy_feature_func,
+            seed=args.seed,
             ref_policy=uniform_policy,
             reg_coef=args.reg_coef,
             step_size=args.dpo_step_size,

@@ -382,7 +382,7 @@ def main(args):
             ipo_grad_type=args.ipo_grad_type,
             param_limit=args.param_limit,
             lamba=args.lamba,
-            report_iter=500,
+            report_iter=1,
         )
     elif args.dpo_type == "rdpo":
         agent = GroupRobustDirectPolicyOptimizationVectorised(
@@ -412,7 +412,7 @@ def main(args):
             l2_reg_rdpo=args.l2_reg_rdpo,
             reg_by_group_weights=0,
             lamba=args.lamba,
-            report_iter=500,
+            report_iter=1,
         )
     else:
         agent = GroupDirectPolicyOptimizationVectorised(
@@ -434,7 +434,7 @@ def main(args):
             param_limit=args.param_limit,
             lamba=args.lamba,
             train_agent=False,  # random_train() func called instead of train()
-            report_iter=500,
+            report_iter=1,
         )
 
     # reward = agent.train_by_cvxpy(dataset=pref_data, env=env)

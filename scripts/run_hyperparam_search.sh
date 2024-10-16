@@ -8,7 +8,7 @@ ACTION_NUM=8
 GROUP_NUM=3
 PREF_DATA_NUM=300
 BATCH_SIZE=300
-DPO_NUM_ITERS=20000
+DPO_NUM_ITERS=100
 STATE_DIM=2
 WEIGHTED_BATCHES='false'
 EXP_ADAPTIVE=0
@@ -16,18 +16,19 @@ RDPO_ADJ='0'
 EVAL_METRIC='argmax'
 IMPORTANCE_SAMPLING='False'
 IMPORTANCE_SAMPLING_WEIGHTS='None'
-IPO_GRAD_TYPE='justdpo'
+IPO_GRAD_TYPE='linear'
 PARAM_LIMIT=5
-USE_CLOSED_FORM='False'
+USE_CLOSED_FORM='True'
 LAMBA=0
 L2_REG_RDPO=0
 USE_WEIGHT_VAL='False'
 USE_UNEVEN_GRP='False'
 USE_UNEVEN_GRP_VAL='False'
 USE_THEORY='False'
-WEIGHTS="[1,1,1]"
-WANDB_GROUP='hyperparam_search'
-WANDB_PROJECT='hp_search'
+WEIGHTS="[1,1,0.4]"
+WANDB_ENTITY='group-robustness-noisy-labels'
+WANDB_GROUP='group1'
+WANDB_PROJECT='hp-search'
 CHI=1
 FEATURE_TYPE='flipped'
 
@@ -39,9 +40,9 @@ mkdir -p "$LOG_DIR"
 SEEDS=(2021 2022 2023)
 
 # Hyperparameters to search
-STEP_SIZES=(0.1 0.5)
-REG_COEFS=(0.1 1.0)
-EXP_STEP_SIZES=(0.005 0.01 0.05) # Doesn't matter for DPO
+STEP_SIZES=(0.1 0.2)
+REG_COEFS=(0.1)
+EXP_STEP_SIZES=(0.01 0.1 1) # Doesn't matter for DPO
 
 # DPO types
 DPO_TYPES=('rdpo') # ('dpo' 'rdpo')
@@ -52,7 +53,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
         for REG_COEF in "${REG_COEFS[@]}"; do
             for EXP_STEP_SIZE in "${EXP_STEP_SIZES[@]}"; do
 		for SEED in "${SEEDS[@]}"; do
-                    DETERMINISTIC_RATIO_LIST="[1,1,1]"
+                    DETERMINISTIC_RATIO_LIST="[1,0.8,1]"
                     VAL_DETERMINISTIC_RATIO_LIST="[1,1,1]"
                    
 		    SUB_LOG_DIR="${LOG_DIR}/${DPO_TYPE},${STEP_SIZE},${REG_COEF},${EXP_STEP_SIZE},${SEED}"

@@ -12,15 +12,16 @@ DPO_NUM_ITERS=100
 
 # Default values
 VAL_DETERMINISTIC='True'
-STEP_SIZE=0.1 # 0.1
+STEP_SIZE=0.1 
 REG_COEF=0.1
-EXP_STEP_SIZE=0.01
+DPO_TYPE='rdpo'
+EXP_STEP_SIZE=0.1
 WEIGHTED_BATCHES='false'
 EXP_ADAPTIVE=0
 RDPO_ADJ='0'
 EVAL_METRIC='argmax'
 IMPORTANCE_SAMPLING='True'
-IMPORTANCE_SAMPLING_WEIGHTS="0.33,0.33,0.33"
+IMPORTANCE_SAMPLING_WEIGHTS='0.333,0.333,0.333'
 IPO_GRAD_TYPE='linear'
 PARAM_LIMIT=5
 USE_CLOSED_FORM='True'
@@ -33,7 +34,7 @@ WEIGHTS="[1,1,0.4]" # "[1,1,1]"
 VAL_WEIGHTS="[1,1,1]" # "[1,1,1]"
 TEST_WEIGHTS="[1,1,1]" # "[1,1,1]"
 WANDB_ENTITY="group-robustness-noisy-labels"
-WANDB_PROJECT="common-good-ipo"
+WANDB_PROJECT="common-good-ipo-even"
 WANDB_GROUP='group_3_exp'
 CHI=1
 
@@ -41,16 +42,16 @@ CHI=1
 TIMESTAMP=$(date +'%Y_%m_%d_%H_%M_%S')
 
 # Seeds
-SEEDS=(2021) #2022 2023 2024 2025 2026 2027 2028 2029 2030) # (2024 2025 2026 2027 2028 2029 2030) # (2021 2022 2023 2024 2025)
+SEEDS=(2021 2022 2023 2024 2025 2026 2027 2028 2029 2030) 
 
 # Noise levels (deterministic_ratio_list)
-NOISE_LEVELS=("1.0") #"0.9" "0.8" "0.7" "0.6" "0.5" "0.4" "0.3"
+NOISE_LEVELS=("1.0" "0.9" "0.8" "0.7" "0.6" "0.5" "0.4" "0.3")
 
 # Feature types
-FEATURE_TYPES=("swapped") # ("same" "flipped" "swapped")
+FEATURE_TYPES=("same") # ("same" "flipped" "swapped")
 
 # DPO types
-DPO_TYPES=("rdpo") # ("dpo" "rdpo")
+DPO_TYPES=("rdpo")
 
 # Main loop
 for DPO_TYPE in "${DPO_TYPES[@]}"; do

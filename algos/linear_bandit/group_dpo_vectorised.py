@@ -38,7 +38,7 @@ class GroupDirectPolicyOptimizationVectorised:
         param_limit: int = 1,  ## elements of vector θ range in [0, param_limit]
         lamba: float = 0,  ## L2 regularisation for closed-form regression of IPO objective in Linear Bandits case
         train_agent: bool = True,  ## if True, use self.train(); else, use self.random_train() func
-        report_iter: int = 2000,  ## log metrics after these iters
+        report_iter: int = 1,  ## log metrics after these iters
     ) -> None:
         self.state_dim = state_dim
         self.action_num = action_num

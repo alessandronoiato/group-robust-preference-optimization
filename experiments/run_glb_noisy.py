@@ -37,9 +37,9 @@ def set_reward_params(feature_dim: int, group_num: int):
         if group_num == 3:
             rparams = np.array(
                 [
-                    [1.0, 3.0, 1.0, 3.0],
-                    [3.0, 1.0, 3.0, 1.0],
-                    [1.5, 2.5, 1.5, 2.5],
+                    [2.0, 2.0, 2.0, 2.0],
+                    [2.0, 2.0, 2.0, 2.0],
+                    [2.0, 2.0, 2.0, 2.0],
                 ],
                 np.float32,
             )
@@ -84,7 +84,7 @@ def parse_args():
     parser.add_argument("--log_dir", type=str, default=None)
     
     # Experiment args
-    parser.add_argument("--seed", type=int, default=2023)
+    parser.add_argument("--seed", type=int, required=True, default=2023)
     parser.add_argument("--pref_data_num", type=int, default=500)
     parser.add_argument("--val_data_num", type=int, default=50)
     parser.add_argument("--num_trials_for_eval", type=int, default=1000) # Test Data size
@@ -332,7 +332,7 @@ def get_agent(args, logger, feature_dim, feature_func):
             ipo_grad_type=args.ipo_grad_type,
             param_limit=args.param_limit,
             lamba=args.lamba,
-            report_iter=100,
+            report_iter=1,
         )
     elif args.dpo_type == "rdpo":
         return GRDPO(
@@ -342,6 +342,7 @@ def get_agent(args, logger, feature_dim, feature_func):
             feature_dim=feature_dim,
             feature_func=feature_func,
             ref_policy=ret_uniform_policy_group(args.action_num),
+            seed=args.seed,
             reg_coef=args.reg_coef,
             step_size=args.dpo_step_size,
             num_iters=args.dpo_num_iters,
@@ -363,7 +364,7 @@ def get_agent(args, logger, feature_dim, feature_func):
             reg_by_group_weights=0,
             lamba=args.lamba,
             chi=args.chi,
-            report_iter=100,
+            report_iter=1,
         )
     else:
         raise ValueError(f"Unknown DPO type: {args.dpo_type}")
