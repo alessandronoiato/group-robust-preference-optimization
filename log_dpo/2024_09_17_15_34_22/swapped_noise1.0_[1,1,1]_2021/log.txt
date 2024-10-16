@@ -1,9 +1,0 @@
-2024-09-17 15:34:27,166 - /Users/noesis/Projects/Group-robust-preference-optimization-bandits/experiments/run_glb_noisy.py[line:198] - INFO: Logging to log_dpo/2024_09_17_15_34_22/swapped_noise1.0_[1,1,1]_2021
-2024-09-17 15:34:27,168 - /Users/noesis/Projects/Group-robust-preference-optimization-bandits/experiments/run_glb_noisy.py[line:199] - INFO: (IB) Seed: 2021
-2024-09-17 15:34:27,169 - /Users/noesis/Projects/Group-robust-preference-optimization-bandits/experiments/run_glb_noisy.py[line:200] - INFO: (IB) Data: 300
-2024-09-17 15:34:27,340 - /Users/noesis/Projects/Group-robust-preference-optimization-bandits/experiments/run_glb_noisy.py[line:296] - INFO: MLE reward loss: 0.3558, l2 distance: 33.1024, acc: 0.82.
-2024-09-17 15:34:27,341 - /Users/noesis/Projects/Group-robust-preference-optimization-bandits/experiments/run_glb_noisy.py[line:297] - INFO: True reward parameter: [[1.  3.  1.  3. ]
- [3.  1.  3.  1. ]
- [1.5 2.5 1.5 2.5]]
-2024-09-17 15:34:27,342 - /Users/noesis/Projects/Group-robust-preference-optimization-bandits/experiments/run_glb_noisy.py[line:298] - INFO: MLE reward parameter: [13.32826759  7.48737825 15.0322688   7.4309059 ]
-2024-09-17 15:34:27,551 - /Users/noesis/Projects/Group-robust-preference-optimization-bandits/experiments/run_glb_noisy.py[line:313] - INFO: Learned oracle reward: 3.5551, 3.8681, 3.1638
