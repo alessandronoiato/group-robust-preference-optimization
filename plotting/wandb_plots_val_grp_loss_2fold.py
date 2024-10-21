@@ -10,27 +10,33 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 ENTITY = "group-robustness-noisy-labels"
-PROJECT = "common-good-ipo"
-SAVE_DIR = "plots/val_grp_loss"
+PROJECT = "cgipo-even-epsilon"
+# Set the fixed deterministic_ratio
 
-def plot_loss(data, deterministic_ratio, save_path):
+DETERMINISTIC_RATIO = '1,0.3,1'  # Modify this value as needed
+# Update SAVE_DIR to include the deterministic ratio
+SAVE_DIR = os.path.join('plots', f'deterministic_ratio_{DETERMINISTIC_RATIO.replace(",", "_")}')
+os.makedirs(SAVE_DIR, exist_ok=True)
+logging.info(f"Save directory created: {os.path.abspath(SAVE_DIR)}")
+
+def plot_loss(data, epsilon, save_path, deterministic_ratio):
     neatplot.set_style()
     
     plt.rcParams['text.usetex'] = False
     plt.rcParams['font.family'] = 'sans-serif'
-    logging.debug(f"Entering plot_loss function with deterministic_ratio: {deterministic_ratio}")
+    logging.debug(f"Entering plot_loss function with epsilon: {epsilon}")
     plt.figure(figsize=(10, 6))
     
     all_means = []
     all_errors = []
     
     for method, color in zip(['rdpo_with_is', 'rdpo_without_is'], ['blue', 'orange']):
-        if method in data and deterministic_ratio in data[method]:
-            mean = data[method][deterministic_ratio]['mean']
-            std_error = data[method][deterministic_ratio]['std_error']
+        if method in data and epsilon in data[method]:
+            mean = data[method][epsilon]['mean']
+            std_error = data[method][epsilon]['std_error']
             iterations = range(1, len(mean) + 1)
             
-            plt.plot(iterations, mean, label=f"{'IPO' if method == 'rdpo_with_is' else 'GR-IPO'}", color=color, linewidth=0.5)
+            plt.plot(iterations, mean, label=f"{'IS' if method == 'rdpo_with_is' else 'GR-IPO'}", color=color, linewidth=0.5)
             plt.fill_between(iterations, mean - std_error, mean + std_error, alpha=0.2, color=color)
             
             all_means.extend(mean)
@@ -39,7 +45,7 @@ def plot_loss(data, deterministic_ratio, save_path):
     if plt.gca().get_lines():
         plt.xlabel('Iteration')
         plt.ylabel('Max Validation Group Loss')
-        plt.title(f'Max Validation Group Loss Comparison\n(Deterministic Ratio: {deterministic_ratio})')
+        plt.title(f'Max Validation Group Loss Comparison\n(Epsilon: {epsilon}, Deterministic Ratio: {deterministic_ratio})')
         plt.legend()
         plt.grid(True, alpha=0.2)
         
@@ -54,7 +60,7 @@ def plot_loss(data, deterministic_ratio, save_path):
         plt.close()
         logging.info(f"Plot saved: {save_path}")
     else:
-        logging.warning(f"No data to plot for deterministic ratio: {deterministic_ratio}")
+        logging.warning(f"No data to plot for epsilon: {epsilon}")
 
 # Main execution
 api = wandb.Api()
@@ -67,6 +73,8 @@ data = {
     'rdpo_with_is': {},
     'rdpo_without_is': {}
 }
+
+# Set the fixed deterministic_ratio
 
 for run in runs:
     logging.info(f"Processing run: {run.name}")
@@ -81,7 +89,7 @@ for run in runs:
     
     logging.info(f"IS enabled: {is_enabled}, IS weights: {is_weights}")
     
-    if is_enabled and is_weights == '0.416,0.416,0.167':
+    if is_enabled:
         method_key = 'rdpo_with_is'
     elif not is_enabled:
         method_key = 'rdpo_without_is'
@@ -92,7 +100,16 @@ for run in runs:
     deterministic_ratio_list = run.config.get('deterministic_ratio_list', [])
     deterministic_ratio = ','.join(map(str, deterministic_ratio_list))
     
-    logging.info(f"Deterministic ratio: {deterministic_ratio}")
+    if deterministic_ratio != DETERMINISTIC_RATIO:
+        logging.info(f"Skipping run with deterministic ratio: {deterministic_ratio}")
+        continue
+
+    epsilon = run.config.get('epsilon')
+    if epsilon is None:
+        logging.warning(f"Epsilon not found in config for run: {run.name}")
+        continue
+    
+    logging.info(f"Epsilon: {epsilon}")
     
     history = run.history(keys=['max_val_grp_loss'])
     
@@ -102,9 +119,9 @@ for run in runs:
     
     max_val_grp_loss = history['max_val_grp_loss'].tolist()
     
-    if deterministic_ratio not in data[method_key]:
-        data[method_key][deterministic_ratio] = []
-    data[method_key][deterministic_ratio].append(max_val_grp_loss)
+    if epsilon not in data[method_key]:
+        data[method_key][epsilon] = []
+    data[method_key][epsilon].append(max_val_grp_loss)
 
 logging.info(f"Processed data: {data.keys()}")
 for method in data:
@@ -112,23 +129,19 @@ for method in data:
 
 # Calculate mean and standard error
 for method in data:
-    for deterministic_ratio in data[method]:
-        losses = np.array(data[method][deterministic_ratio])
+    for epsilon in data[method]:
+        losses = np.array(data[method][epsilon])
         mean = np.mean(losses, axis=0)
         std_error = sem(losses, axis=0)
-        data[method][deterministic_ratio] = {
+        data[method][epsilon] = {
             'mean': mean,
             'std_error': std_error
         }
 
-# Create save directory if it doesn't exist
-os.makedirs(SAVE_DIR, exist_ok=True)
-logging.info(f"Save directory created: {os.path.abspath(SAVE_DIR)}")
-
 # Create plots
-all_ratios = set(data['rdpo_with_is'].keys()) | set(data['rdpo_without_is'].keys())
-for deterministic_ratio in all_ratios:
-    save_path = os.path.join(SAVE_DIR, f'loss_comparison_ratio_{deterministic_ratio}.png')
-    plot_loss(data, deterministic_ratio, save_path)
+all_epsilons = set(data['rdpo_with_is'].keys()) | set(data['rdpo_without_is'].keys())
+for epsilon in all_epsilons:
+    save_path = os.path.join(SAVE_DIR, f'loss_comparison_epsilon_{epsilon}.png')
+    plot_loss(data, epsilon, save_path, DETERMINISTIC_RATIO)
 
-logging.info(f"Plotting complete. Plots should be saved in {os.path.abspath(SAVE_DIR)}")
+logging.info(f"Plotting complete. Plots saved in {os.path.abspath(SAVE_DIR)}")

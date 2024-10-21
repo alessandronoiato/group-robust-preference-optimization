@@ -50,7 +50,7 @@ def create_log_dir(args):
     # run_id = "{}-{}-{}".format(
     #    args.agent, args.seed, time.strftime("%Y-%m-%d-%H-%M-%S")
     # )
-    run_id = f"{args.agent}-{args.dpo_type}-{args.seed}-{args.weights}-{time.strftime('%Y-%m-%d-%H-%M-%S')}"
+    run_id = f"{args.agent}-{args.dpo_type}-{args.seed}-{args.weights}-{args.epsilon}-{time.strftime('%Y-%m-%d-%H-%M-%S')}"
     log_dir = os.path.join(args.logdir, run_id)
     # log_dir = os.path.join(args.logdir, args.agent, run_id)
     os.makedirs(log_dir, exist_ok=True)

@@ -31,15 +31,15 @@ def float_list(arg):
         raise argparse.ArgumentTypeError("Invalid list format or elements are not floats")
 
 
-def set_reward_params(feature_dim: int, group_num: int):
+def set_reward_params(feature_dim: int, group_num: int, epsilon: float = 0.0):
     assert feature_dim in (4,)
     if feature_dim == 4:
         if group_num == 3:
             rparams = np.array(
                 [
-                    [2.0, 2.0, 2.0, 2.0],
-                    [2.0, 2.0, 2.0, 2.0],
-                    [2.0, 2.0, 2.0, 2.0],
+                    [1.0 - epsilon, 1.0 - epsilon, 1.0 - epsilon, 1.0 - epsilon],
+                    [1.0, 1.0, 1.0, 1.0],
+                    [1.0 + epsilon, 1.0 + epsilon, 1.0 + epsilon, 1.0 + epsilon],
                 ],
                 np.float32,
             )
@@ -82,6 +82,7 @@ def parse_args():
     parser.add_argument("--group_num", type=int, default=2)
     parser.add_argument("--feature_type", type=str, default="same")
     parser.add_argument("--log_dir", type=str, default=None)
+    parser.add_argument("--epsilon", type=float, default=0.0)
     
     # Experiment args
     parser.add_argument("--seed", type=int, required=True, default=2023)
@@ -97,6 +98,7 @@ def parse_args():
     parser.add_argument("--dpo_step_size", type=float, default=0.1)
     parser.add_argument("--dpo_adaptive", action="store_true")
     parser.add_argument("--dpo_ada_coef", type=float, default=1.0)
+    
 
     # RDPO args
     parser.add_argument("--rdpo_batch_size", type=int, default=5)
@@ -170,9 +172,9 @@ def setup_wandb(args):
 
     # Experiment Name
     if args.dpo_type == "dpo":
-        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.seed}"
+        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.seed}_{args.epsilon}"
     else:
-        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.rdpo_exp_step_size}_{args.rdpo_batch_size}_{args.rdpo_weighted_batches}_{args.rdpo_adj}_{args.deterministic_ratio_list}_{args.seed}"
+        exp_name = f"{args.wandb_name}_{args.dpo_type}_{args.rdpo_exp_step_size}_{args.rdpo_batch_size}_{args.rdpo_weighted_batches}_{args.rdpo_adj}_{args.deterministic_ratio_list}_{args.seed}_{args.epsilon}"
     
     # Group
     wandb_group = f"state_dim{args.state_dim}action_num={args.action_num}group_num{args.group_num}pref_data_num{args.pref_data_num}weights={args.weights}feature_type{args.feature_type}eval_metric{args.eval_metric}{args.wandb_group}"
@@ -211,7 +213,7 @@ def setup_environment(args):
         feature_type=args.feature_type,
     )
     
-    reward_param = set_reward_params(feature_dim, args.group_num)
+    reward_param = set_reward_params(feature_dim, args.group_num, args.epsilon)
     if args.wandb_use:
         wandb.config["true_reward_params"] = reward_param
        
