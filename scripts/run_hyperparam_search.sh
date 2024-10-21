@@ -40,23 +40,26 @@ mkdir -p "$LOG_DIR"
 SEEDS=(2021 2022 2023)
 
 # Hyperparameters to search
-STEP_SIZES=(0.1 0.2)
-REG_COEFS=(0.1)
-EXP_STEP_SIZES=(0.01 0.1 1) # Doesn't matter for DPO
+STEP_SIZES=(1 0.1 0.01 0.001)
+C_VALS=(0 5 10 15 20)
+REG_COEFS=(0.01 0.1 1.0)
+EXP_STEP_SIZES=(0.01) # Doesn't matter for DPO or CGD
+
 
 # DPO types
-DPO_TYPES=('rdpo') # ('dpo' 'rdpo')
+DPO_TYPES=('cgd') # ('dpo' 'rdpo')
 
 
 for DPO_TYPE in "${DPO_TYPES[@]}"; do
     for STEP_SIZE in "${STEP_SIZES[@]}"; do
+	for C in "${C_VALS[@]}"; do
         for REG_COEF in "${REG_COEFS[@]}"; do
             for EXP_STEP_SIZE in "${EXP_STEP_SIZES[@]}"; do
 		for SEED in "${SEEDS[@]}"; do
                     DETERMINISTIC_RATIO_LIST="[1,0.8,1]"
                     VAL_DETERMINISTIC_RATIO_LIST="[1,1,1]"
                    
-		    SUB_LOG_DIR="${LOG_DIR}/${DPO_TYPE},${STEP_SIZE},${REG_COEF},${EXP_STEP_SIZE},${SEED}"
+		    SUB_LOG_DIR="${LOG_DIR}/${DPO_TYPE},${STEP_SIZE},${REG_COEF},${C},${SEED}"
 		    mkdir -p $SUB_LOG_DIR
 		    mkdir -p "$SUB_LOG_DIR/log"  
 	     		    
@@ -98,10 +101,11 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
                     --use_theory ${USE_THEORY} \
 		    --wandb_project ${WANDB_PROJECT} \
 		    --wandb_logdir "${SUB_LOG_DIR}/log" \
-		    --wandb_name "${DPO_TYPE},${STEP_SIZE},${REG_COEF},${EXP_STEP_SIZE}" \
+		    --wandb_name "${DPO_TYPE},${STEP_SIZE},${REG_COEF},${C}" \
                     --chi ${CHI}
                 done
             done
         done
     done
+done
 done

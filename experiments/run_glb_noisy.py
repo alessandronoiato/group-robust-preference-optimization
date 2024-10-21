@@ -5,13 +5,18 @@ import os
 from typing import List
 
 import numpy as np
-import yaml
 import wandb
+import yaml
 
+from algos.linear_bandit.common_gradient_descent import CommonGradientDescent as CGD
 from algos.linear_bandit.group_dpo_vectorised import GroupDirectPolicyOptimizationVectorised as GDPO
-from algos.linear_bandit.group_robust_dpo_vectorised_gradfix import GroupRobustDirectPolicyOptimizationVectorised as GRDPO
+from algos.linear_bandit.group_robust_dpo_vectorised_gradfix import (
+    GroupRobustDirectPolicyOptimizationVectorised as GRDPO,
+)
 from algos.linear_bandit.mle import MLERewardLearning
-from envs.group_linear_bandit import GroupLinearBandit as GLB, GroupLinearBanditSep as GLBS, ret_feature_func
+from envs.group_linear_bandit import GroupLinearBandit as GLB
+from envs.group_linear_bandit import GroupLinearBanditSep as GLBS
+from envs.group_linear_bandit import ret_feature_func
 from utils.collect_data import (
     collect_group_preference_data,
     collect_group_preference_data_partial_deterministic_list,
@@ -21,6 +26,7 @@ from utils.collect_data import (
 from utils.io_utils import create_log_dir, save_code, save_config
 from utils.logger import Logger
 from utils.utils import return_apt_weights, softmax
+
 
 def float_list(arg):
     try:
@@ -51,7 +57,7 @@ def set_reward_params(feature_dim: int, group_num: int, epsilon: float = 0.0):
                 ],
                 np.float32,
             )
-    
+
     return rparams
 
 
@@ -88,7 +94,7 @@ def parse_args():
     parser.add_argument("--seed", type=int, required=True, default=2023)
     parser.add_argument("--pref_data_num", type=int, default=500)
     parser.add_argument("--val_data_num", type=int, default=50)
-    parser.add_argument("--num_trials_for_eval", type=int, default=1000) # Test Data size
+    parser.add_argument("--num_trials_for_eval", type=int, default=1000)  # Test Data size
 
     # Algorithm args
     parser.add_argument("--agent", type=str, default="pg")
@@ -106,6 +112,9 @@ def parse_args():
     parser.add_argument("--rdpo_weighted_batches", type=lambda x: (str(x).lower() == "true"), default=True)
     parser.add_argument("--rdpo_adj", type=str, default="0")
     parser.add_argument("--exp_adaptive", type=float, default=0.0)
+
+    # CGD args
+    parser.add_argument("--C", type=float)
 
     # Data args
     parser.add_argument("--deterministic_ratio_list", type=float_list, default="[0,0]")
@@ -140,6 +149,9 @@ def parse_args():
     parser.add_argument("--use_theory", type=lambda x: (str(x).lower() == "true"), default=False)
     parser.add_argument("--chi", type=float, default=1.0)
 
+    parser.add_argument('--reward_param', type=str, required=True,
+                        help='Reward parameters for each group. Format: "[[x,x,x,x],[y,y,y,y],[z,z,z,z]]"')
+
     # Wandb args
     parser.add_argument("--wandb_use", action="store_true")
     parser.add_argument("--wandb_key", type=str, default="fbf79a31d3c4d52eaf326308d880d3ebca26b10d")
@@ -149,6 +161,7 @@ def parse_args():
     parser.add_argument("--wandb_name", type=str, default="linear_bandits")
 
     return parser.parse_args()
+
 
 def setup_wandb(args):
     wandb.login(key=args.wandb_key)
@@ -189,6 +202,7 @@ def setup_wandb(args):
         tags=tags,
     )
 
+
 def setup_logging(args):
     if args.log_dir is None:
         log_dir = create_log_dir(args)
@@ -197,12 +211,13 @@ def setup_logging(args):
     save_code(log_dir)
     save_config(args.__dict__, log_dir)
     logger = Logger(log_dir)
-    
+
     logger.info(f"Logging to {log_dir}")
     logger.info(f"(IB) Seed: {args.seed}")
     logger.info(f"(IB) Data: {args.pref_data_num}")
-    
+
     return logger
+
 
 def setup_environment(args):
     feature_dim = 2 * args.state_dim
@@ -212,11 +227,12 @@ def setup_environment(args):
         group_num=args.group_num,
         feature_type=args.feature_type,
     )
-    
-    reward_param = set_reward_params(feature_dim, args.group_num, args.epsilon)
+
+    # reward_param = set_reward_params(feature_dim, args.group_num)
+    reward_param = np.array(ast.literal_eval(args.reward_param), dtype=np.float32)
     if args.wandb_use:
         wandb.config["true_reward_params"] = reward_param
-       
+
     env = GLBS(
         state_dim=args.state_dim,
         action_num=args.action_num,
@@ -230,13 +246,14 @@ def setup_environment(args):
 
     return env, feature_dim, feature_func
 
+
 def get_data(args, env):
     weights = return_apt_weights(args.weights, args.group_num)
     val_weights = return_apt_weights(args.val_weights, args.group_num)
     test_weights = return_apt_weights(args.test_weights, args.group_num)
-    
+
     uniform_policy = ret_uniform_policy_group(args.action_num)
-    
+
     # Train Data
     if args.use_uneven_grp:
         train_data = collect_uneven_group_preference_data_partial_deterministic_list(
@@ -253,16 +270,15 @@ def get_data(args, env):
             weights,
             uniform_policy,
             deterministic_ratio_list=args.deterministic_ratio_list,
-
         )
 
     # Test Data
     test_data = collect_group_preference_data(
-         num=args.num_trials_for_eval,
-         env=env,
-         weights=test_weights,
-         policy_func=uniform_policy,
-         deterministic=True,
+        num=args.num_trials_for_eval,
+        env=env,
+        weights=test_weights,
+        policy_func=uniform_policy,
+        deterministic=True,
     )
 
     # Val Data
@@ -285,6 +301,7 @@ def get_data(args, env):
 
     return train_data, val_data, test_data
 
+
 def train_mle_reward_model(args, logger, feature_func, train_data, true_reward_param):
     reward_model = MLERewardLearning(
         feature_func,
@@ -295,12 +312,13 @@ def train_mle_reward_model(args, logger, feature_func, train_data, true_reward_p
         args.mle_ada_coef,
     )
     loss, l2_dist, acc = reward_model.train_by_cvxpy_group(dataset=train_data, true_reward_param=true_reward_param)
-    
+
     logger.info(f"MLE reward loss: {loss:.4f}, l2 distance: {l2_dist:.4f}, acc: {acc:.2f}.")
     logger.info("True reward parameter: {}".format(true_reward_param))
     logger.info("MLE reward parameter: {}".format(reward_model.get_reward_param))
 
     return reward_model
+
 
 def oracle_test(args, logger, env, feature_func, learned_reward_param, test_data):
     learned_env = GLB(
@@ -314,6 +332,7 @@ def oracle_test(args, logger, env, feature_func, learned_reward_param, test_data
     learned_oracle_opt_reward = env.evaluate_reward_group_wise(policy=learned_env.get_opt_policy(), states=test_data)
     formatted_learned_oracle_opt_reward = ", ".join([f"{reward:.4f}" for reward in learned_oracle_opt_reward])
     logger.info(f"Learned oracle reward: {formatted_learned_oracle_opt_reward}")
+
 
 def get_agent(args, logger, feature_dim, feature_func):
     if args.dpo_type == "dpo":
@@ -368,8 +387,47 @@ def get_agent(args, logger, feature_dim, feature_func):
             chi=args.chi,
             report_iter=1,
         )
+    elif args.dpo_type == "cgd":
+        return CGD(
+            state_dim=args.state_dim,
+            action_num=args.action_num,
+            group_num=args.group_num,
+            feature_dim=feature_dim,
+            feature_func=feature_func,
+            ref_policy=ret_uniform_policy_group(args.action_num),
+            reg_coef=args.reg_coef,
+            step_size=args.dpo_step_size,
+            C=args.C,
+            num_iters=args.dpo_num_iters,
+            batch_size=args.rdpo_batch_size,
+            logger=logger,
+            wandb_use=args.wandb_use,
+            param_limit=args.param_limit,
+            report_iter=1,
+            seed=args.seed,
+        )
+    elif args.dpo_type == "cgd":
+        return CGD(
+            state_dim=args.state_dim,
+            action_num=args.action_num,
+            group_num=args.group_num,
+            feature_dim=feature_dim,
+            feature_func=feature_func,
+            ref_policy=ret_uniform_policy_group(args.action_num),
+            reg_coef=args.reg_coef,
+            step_size=args.dpo_step_size,
+            C=args.C,
+            num_iters=args.dpo_num_iters,
+            batch_size=args.rdpo_batch_size,
+            logger=logger,
+            wandb_use=args.wandb_use,
+            param_limit=args.param_limit,
+            report_iter=1,
+            seed=args.seed,
+        )
     else:
         raise ValueError(f"Unknown DPO type: {args.dpo_type}")
+
 
 def train_and_evaluate_agent(args, logger, env, feature_dim, feature_func, train_data, val_data, test_data):
     opt_reward = env.evaluate_reward_group_wise(policy=env.get_opt_policy(), states=test_data)
@@ -385,10 +443,11 @@ def train_and_evaluate_agent(args, logger, env, feature_dim, feature_func, train
 
     return agent, reward
 
+
 def log_final_results(args, logger, env, agent, reward, feature_func, test_data):
     policy_param = agent.get_param
     logger.info(f"Policy parameter learned solely on the preference data {args.dpo_type}: {policy_param}.")
-    
+
     opt_reward = env.evaluate_reward_group_wise(policy=env.get_opt_policy(), states=test_data)
     uni_reward = env.evaluate_reward_group_wise(policy=ret_uniform_policy_group(args.action_num), states=test_data)
     rew_error = [float((a - b) / a) for a, b in zip(opt_reward, reward)]
@@ -397,7 +456,7 @@ def log_final_results(args, logger, env, agent, reward, feature_func, test_data)
     formatted_uni_reward = ", ".join([f"{reward:.4f}" for reward in uni_reward])
     formatted_reward = ", ".join([f"{reward:.4f}" for reward in reward])
     formatted_rew_error = ", ".join([f"{reward:.4f}" for reward in rew_error])
-    
+
     logger.info(f"Uniform reward: {formatted_uni_reward}")
     logger.info(f"Optimal reward: {formatted_opt_reward}")
     logger.info(f"Policy reward: {formatted_reward}")
@@ -419,7 +478,7 @@ def log_final_results(args, logger, env, agent, reward, feature_func, test_data)
     logger.info(
         f"Optimal reward: {formatted_opt_reward}\nKnown param reward: {known_param_rewards}, Known param reward error: {known_param_rew_err}."
     )
-    
+
     if args.wandb_use:
         d_wandb = {}
         for i, err in enumerate(rew_error):
@@ -444,15 +503,17 @@ def log_final_results(args, logger, env, agent, reward, feature_func, test_data)
                 d_wandb[key] = e
         wandb.log(d_wandb)
 
+
 def save_results(args, rew_error, reward):
     rew_err_dict = {args.pref_data_num: rew_error}
     rew_dict = {args.pref_data_num: reward}
-    
+
     save_path = os.path.join(args.wandb_logdir, f"reward_error_{args.dpo_type}.yml")
     yaml.dump(rew_err_dict, open(save_path, "w"), default_flow_style=False)
-    
+
     save_path = os.path.join(args.wandb_logdir, f"reward_{args.dpo_type}.yml")
     yaml.dump(rew_dict, open(save_path, "w"), default_flow_style=False)
+
 
 def main(args):
     np.random.seed(args.seed)
@@ -465,10 +526,10 @@ def main(args):
 
     # Environment
     env, feature_dim, feature_func = setup_environment(args)
-    
+
     # Generate data
     train_data, val_data, test_data = get_data(args, env)
-    
+
     # Train and evaluate MLE reward model
     reward_model = train_mle_reward_model(args, logger, feature_func, train_data, env.reward_param)
 
@@ -476,14 +537,17 @@ def main(args):
     oracle_test(args, logger, env, feature_func, reward_model.get_reward_param, test_data)
 
     # Train agent
-    agent, reward = train_and_evaluate_agent(args, logger, env, feature_dim, feature_func, train_data, val_data, test_data)
+    agent, reward = train_and_evaluate_agent(
+        args, logger, env, feature_dim, feature_func, train_data, val_data, test_data
+    )
 
     # Log final results
     log_final_results(args, logger, env, agent, reward, feature_func, test_data)
-    
+
     # Clean up
     if args.wandb_use:
         wandb.finish()
+
 
 if __name__ == "__main__":
     main(parse_args())

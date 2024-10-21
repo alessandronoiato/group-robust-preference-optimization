@@ -1,7 +1,7 @@
 import logging
+import sys
 from logging import handlers
 
-import sys
 from rich.console import Console
 from rich.logging import RichHandler
 

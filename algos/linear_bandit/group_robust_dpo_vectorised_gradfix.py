@@ -47,6 +47,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         train_agent: bool = True,  ## if True, use self.train(); else, use self.random_train() func
         report_iter: int = 1,  ## log metrics after these iters
     ) -> None:
+        print(f"{ipo_grad_type=}")
         self.state_dim = state_dim
         self.action_num = action_num
         self.feature_dim = feature_dim
@@ -366,7 +367,24 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         ######################################################################################
         ################### VECTORISED REDEFINITION across all transitions ###################
         ######################################################################################
-        if self.ipo_grad_type == "justdpo":
+        if self.ipo_grad_type == "noisy_dpo":
+            log_ratio_diff_all = (
+                self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
+            )
+            sigmoid_pos = sigmoid(log_ratio_diff_all)
+            sigmoid_neg = sigmoid(-log_ratio_diff_all)
+
+            coef = np.zeros_like(log_ratio_diff_all)
+
+            for group_id in range(self.group_num):
+                nl = self.noise_level[group_id]
+                group_indices = group_id_idx_all[group_id]
+
+                group_loss[group_id] = (((1 - nl) * np.sum(-np.log(sigmoid_pos[group_indices]))) - (nl * np.sum(-np.log(sigmoid_neg[group_indices])))) / (1 - 2*nl) + self.adj[group_id] / np.sqrt(self.group_counts[group_id])
+
+                coef[group_indices] = ((1-nl)*sigmoid_neg[group_indices] + nl*sigmoid_pos[group_indices]) / (1-2*nl)
+           
+        elif self.ipo_grad_type == "justdpo":
             log_ratio_diff_all = (
                 self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
             )  # log_ratio_diff_all shape (len(dataset),1)
@@ -457,7 +475,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 )  # / cur_group_counts # regularisation L2
                 weighted_group_grad[g] += (
                     2 * self.l2_reg_rdpo * self.param
-                )  # * self.group_weights[g] #/ cur_group_counts[g]
+                ) # * self.group_weights[g] #/ cur_group_counts[g]
         elif self.reg_by_group_weights != 0:
             group_loss -= self.reg_by_group_weights * np.square(self.group_weights)  # Paper Theorem 3.1
             # grad is invariant to this negative term, so no update
@@ -1076,7 +1094,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         # VECTORISATION for log_ratio_diff
         log_ratio_diff = self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
         loss = np.sum(-np.log(sigmoid(log_ratio_diff))) / len(dataset)
-        loss /= len(dataset)
 
         if self.l2_reg_rdpo != 0:
             loss += self.l2_reg_rdpo * np.square(np.linalg.norm(self.param))  # / len(dataset) # regularisation L2
@@ -1277,15 +1294,43 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         test_dataset: list[GroupTransition],
         env: GroupLinearBandit,
         optimal_reward: List[float],
-    ) -> float:
+    ) -> float:        
         print(f"Starting TRAIN method")
         print(f"importance_sampling: {self.importance_sampling}")
         print(f"Initial self.param: {self.param}")
         print(f"Initial self.group_weights: {self.group_weights}")
         print(f"Validation dataset size: {len(val_dataset)}")
         print(f"First few validation transitions: {val_dataset[:5]}")
-        print(self.ipo_grad_type)
-        # print(dataset)
+        self.noise_level = [0 for _ in range(self.group_num)]
+        group_counts = defaultdict(int)
+
+        print(f"{env.reward_param=}")
+        for idx, transition in enumerate(dataset):
+            state, action_one, action_two, group_id, pref = (
+                transition.state,
+                transition.action_0,
+                transition.action_1,
+                transition.group_id,
+                transition.pref,
+            )
+
+            env.cur_state = state
+            reward_one, reward_two = env.sample(action_one, group_id), env.sample(action_two, group_id)
+
+            expected_pref = 0 if reward_one > reward_two else 1
+
+            if expected_pref != pref:
+                self.noise_level[group_id] += 1
+
+            group_counts[group_id] += 1
+
+        print(f"NOISE LEVEL PRE: {self.noise_level}")
+        for grp in range(self.group_num):
+            self.noise_level[grp] /= group_counts[grp]
+
+        print(f"GROUP COUNTS: {group_counts}")
+        print(f"NOISE LEVEL: {self.noise_level}")
+
         ratio = int(len(dataset) / self.batch_size)
         # Collect unique group IDs using set comprehension
         unique_group_ids = {transition.group_id for transition in dataset}
@@ -1295,7 +1340,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
         # Iterate through the transitions and count occurrences
         for group_transition in dataset:
-            print(group_transition)
             group_counts[group_transition.group_id] += 1
 
         # Sort the dictionary items by group_id
@@ -1437,21 +1481,21 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 print("UPDATE PARAM GroupRobustDPO: ", self.theta_update)
                 print("TOTAL LOSS GroupRobustDPO: ", self.total_loss)
 
-                if self.ipo_grad_type == "justdpo":
+                if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
                     train_loss = self.evaluate_loss(dataset)
                     val_loss = self.evaluate_loss(val_dataset)
                 else:
                     train_loss = self.evaluate_ipo_loss(dataset)
                     val_loss = self.evaluate_ipo_loss(val_dataset)
 
-                if self.ipo_grad_type == "justdpo":
+                if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
                     train_wt_loss = self.evaluate_weighted_loss(dataset)
                     val_wt_loss = self.evaluate_weighted_loss(val_dataset)
                 else:
                     train_wt_loss = self.evaluate_weighted_ipo_loss(dataset)
                     val_wt_loss = self.evaluate_weighted_ipo_loss(val_dataset)
 
-                if self.ipo_grad_type == "justdpo":
+                if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
                     train_grp_loss = self.evaluate_grp_loss(dataset)
                     val_grp_loss = self.evaluate_grp_loss(val_dataset)
                 else:
@@ -1463,9 +1507,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
                 kl_dist = self.evaluate_KL(env=env, states=test_dataset)
 
-                # Evaluate the reward on the test dataset:
-                # rew = self.evaluate_reward(env=env,
-                #                           states=test_dataset)
                 rew_err = [
                     float(a - b) / a for a, b in zip(optimal_reward, self.evaluate_reward(env=env, states=test_dataset))
                 ]
@@ -1553,21 +1594,21 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                     self.logger.info(logging_str)
                 else:
                     print(logging_str)
-        if self.ipo_grad_type == "justdpo":
+        if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
             train_loss = self.evaluate_loss(dataset)
             val_loss = self.evaluate_loss(val_dataset)
         else:
             train_loss = self.evaluate_ipo_loss(dataset)
             val_loss = self.evaluate_ipo_loss(val_dataset)
 
-        if self.ipo_grad_type == "justdpo":
+        if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
             train_wt_loss = self.evaluate_weighted_loss(dataset)
             val_wt_loss = self.evaluate_weighted_loss(val_dataset)
         else:
             train_wt_loss = self.evaluate_weighted_ipo_loss(dataset)
             val_wt_loss = self.evaluate_weighted_ipo_loss(val_dataset)
 
-        if self.ipo_grad_type == "justdpo":
+        if self.ipo_grad_type in ["justdpo", "noisy_dpo"]:
             train_grp_loss = self.evaluate_grp_loss(dataset)
             val_grp_loss = self.evaluate_grp_loss(val_dataset)
         else:
@@ -1578,9 +1619,6 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
         formatted_kl = ", ".join([f"{kld:.4f}" for kld in kl_dist])
 
-        # Evaluate the reward on the test dataset:
-        # rew = self.evaluate_reward(env=env,
-        #                           states=test_dataset)
         rew_err = [float(a - b) / a for a, b in zip(optimal_reward, self.evaluate_reward(env=env, states=test_dataset))]
         formatted_rew = ", ".join([f"{reward:.4f}" for reward in rew_err])
 

@@ -692,15 +692,15 @@ class GroupDirectPolicyOptimizationVectorised:
 
             train_grp_loss = self.evaluate_ipo_grp_loss(dataset)
             val_grp_loss = self.evaluate_ipo_grp_loss(val_dataset)
-                        
+
             kl_dist=self.evaluate_KL(env=env,states=test_dataset)
 
             formatted_kl=", ".join([f"{kld:.4f}" for kld in kl_dist])
 
             #Evaluate the reward on the test dataset:
-            #print(optimal_reward,self.evaluate_reward(env=env, 
+            #print(optimal_reward,self.evaluate_reward(env=env,
             #                           states=test_dataset))
-            rew_err = [float(a - b)/a for a, b in zip(optimal_reward,self.evaluate_reward(env=env, 
+            rew_err = [float(a - b)/a for a, b in zip(optimal_reward,self.evaluate_reward(env=env,
                                         states=test_dataset) )]
             formatted_rew=", ".join([f"{reward:.4f}" for reward in rew_err])
 
@@ -714,8 +714,8 @@ class GroupDirectPolicyOptimizationVectorised:
             max_val_grp_loss=np.max(val_grp_loss)
             max_train_grp_loss_index=np.argmax(train_grp_loss)
             max_val_grp_loss_index=np.argmax(val_grp_loss)
-            
-            
+
+
             step=-1
             logging_str = (f"Iteration: {step: d}, train_loss: {train_loss: .4f}, "
                         f"val_loss: {val_loss: .4f}, grad_norm: {grad_norm:.4f}, live_grad: {live_grad:.4f}, "
@@ -725,15 +725,15 @@ class GroupDirectPolicyOptimizationVectorised:
                         f"max_kl_dist: {max_kl_dist: .4f}, max_kl_dist_index: {max_kl_dist_index}, "
                         f"max_train_grp_loss: {max_train_grp_loss: .4f}, max_train_grp_loss_index: {max_train_grp_loss_index}, "
                         f"max_val_grp_loss: {max_val_grp_loss: .4f}, max_val_grp_loss_index: {max_val_grp_loss_index}, ")
-            
+
             if self.wandb_use:
                 d_wandb = {
-                    "Iteration": step, "train_loss": train_loss, 
+                    "Iteration": step, "train_loss": train_loss,
                         "val_loss": val_loss, "grad_norm": grad_norm, "live_grad": live_grad,
-                        "max_reward_err": max_reward_err , "max_reward_err_index": max_reward_err_index, 
-                        "max_kl_dist" : max_kl_dist, "max_kl_dist_index": max_kl_dist_index, 
-                        "max_train_grp_loss": max_train_grp_loss, "max_train_grp_loss_index": max_train_grp_loss_index, 
-                        "max_val_grp_loss": max_val_grp_loss, "max_val_grp_loss_index": max_val_grp_loss_index, 
+                        "max_reward_err": max_reward_err , "max_reward_err_index": max_reward_err_index,
+                        "max_kl_dist" : max_kl_dist, "max_kl_dist_index": max_kl_dist_index,
+                        "max_train_grp_loss": max_train_grp_loss, "max_train_grp_loss_index": max_train_grp_loss_index,
+                        "max_val_grp_loss": max_val_grp_loss, "max_val_grp_loss_index": max_val_grp_loss_index,
                 }
                 # Assuming rew_err is a list
                 for i, err in enumerate(rew_err):
@@ -741,18 +741,18 @@ class GroupDirectPolicyOptimizationVectorised:
                     d_wandb[key] = err
                 for i, param in enumerate(self.param):
                     key = f"reward_param_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                    d_wandb[key] = param 
+                    d_wandb[key] = param
                 for i, grp_ls in enumerate(train_grp_loss):
                     key = f"train_group_loss_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                    d_wandb[key] = grp_ls    
+                    d_wandb[key] = grp_ls
                 for i, grp_ls in enumerate(val_grp_loss):
                     key = f"val_group_loss_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                    d_wandb[key] = grp_ls   
+                    d_wandb[key] = grp_ls
                 for i, kld in enumerate(kl_dist):
                     key = f"KL_distance_{i + 1}"  # Creating dynamic key, e.g., "reward_err_1", "reward_err_2", ...
-                    d_wandb[key] = kld 
+                    d_wandb[key] = kld
                 wandb.log(d_wandb)
-            
+
             if self.logger:
                 self.logger.info(logging_str)
             else:
@@ -841,7 +841,7 @@ class GroupDirectPolicyOptimizationVectorised:
                 print(logging_str)
             rew = self.evaluate_reward(env, test_dataset)
             return rew
-        
+
         for step in range(self.num_iters):
             grad_norm = self.update_once(dataset)
             if step % self.report_iter == 0:
