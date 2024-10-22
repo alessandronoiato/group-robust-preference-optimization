@@ -1,6 +1,8 @@
 # Logs
+log_cgd/
 log_dpo/
 log_rdpo/
+log-hyperparam-search/
 plots/
 # Plots
 plot/
