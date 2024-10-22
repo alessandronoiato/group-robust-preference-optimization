@@ -14,14 +14,14 @@ DPO_NUM_ITERS=100
 VAL_DETERMINISTIC='True'
 STEP_SIZE=0.1 
 REG_COEF=0.1
-DPO_TYPE='rdpo'
+DPO_TYPE='cgd'
 EXP_STEP_SIZE=0.1
 WEIGHTED_BATCHES='false'
+C=0
 EXP_ADAPTIVE=0
 RDPO_ADJ='0'
 EVAL_METRIC='argmax'
-IMPORTANCE_SAMPLING='True'
-IMPORTANCE_SAMPLING='True'
+IMPORTANCE_SAMPLING='False'
 IMPORTANCE_SAMPLING_WEIGHTS='None'
 IPO_GRAD_TYPE='linear'
 PARAM_LIMIT=5
@@ -35,8 +35,8 @@ WEIGHTS="[1,1,0.4]" # "[1,1,1]"
 VAL_WEIGHTS="[1,1,1]" # "[1,1,1]"
 TEST_WEIGHTS="[1,1,1]" # "[1,1,1]"
 WANDB_ENTITY="group-robustness-noisy-labels"
-WANDB_PROJECT="cgipo-even-epsilon"
-WANDB_GROUP='group_3_exp'
+WANDB_PROJECT="common-good-ipo-even"
+WANDB_GROUP='hp-search'
 CHI=1
 
 # Timestamp for meta log directory
@@ -52,10 +52,13 @@ NOISE_LEVELS=("1.0" "0.9" "0.8" "0.7" "0.6" "0.5" "0.4" "0.3")
 FEATURE_TYPES=("same") # ("same" "flipped" "swapped")
 
 # DPO types
-DPO_TYPES=("rdpo")
+DPO_TYPES=("cgd")
 
 # EPSILONS
-EPSILONS=("0.0" "0.1" "0.2" "0.5")
+EPSILONS=("0.0")
+
+# REWARD_PARAM
+REWARD_PARAM='[[2.0, 2.0, 2.0, 2.0],[2.0, 2.0, 2.0, 2.0],[2.0, 2.0, 2.0, 2.0]]'
 
 # Main loop
 for DPO_TYPE in "${DPO_TYPES[@]}"; do
@@ -83,6 +86,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
                         --pref_data_num ${PREF_DATA_NUM} \
                         --dpo_num_iters ${DPO_NUM_ITERS} \
                         --wandb_use \
+                        --C ${C} \
                         --wandb_group "${WANDB_GROUP}" \
                         --reg_coef ${REG_COEF} \
                         --seed ${SEED} \
@@ -99,6 +103,7 @@ for DPO_TYPE in "${DPO_TYPES[@]}"; do
                         --rdpo_weighted_batches ${WEIGHTED_BATCHES} \
                         --exp_adaptive ${EXP_ADAPTIVE} \
                         --rdpo_adj ${RDPO_ADJ} \
+                        --reward_param "${REWARD_PARAM}" \
                         --eval_metric ${EVAL_METRIC} \
                         --importance_sampling ${IMPORTANCE_SAMPLING} \
                         --importance_sampling_weights ${IMPORTANCE_SAMPLING_WEIGHTS} \

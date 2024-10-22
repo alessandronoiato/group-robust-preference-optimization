@@ -1,0 +1,9 @@
+2024-10-22 23:57:19,224 - /Users/noesis/Code/group-robust-preference-optimization/experiments/run_glb_noisy.py[line:215] - INFO: Logging to log_cgd/2024_10_22_23_57_16/same_noise1.0_[1,1.0,1]_2021_0.0
+2024-10-22 23:57:19,226 - /Users/noesis/Code/group-robust-preference-optimization/experiments/run_glb_noisy.py[line:216] - INFO: (IB) Seed: 2021
+2024-10-22 23:57:19,226 - /Users/noesis/Code/group-robust-preference-optimization/experiments/run_glb_noisy.py[line:217] - INFO: (IB) Data: 300
+2024-10-22 23:57:19,355 - /Users/noesis/Code/group-robust-preference-optimization/experiments/run_glb_noisy.py[line:316] - INFO: MLE reward loss: 0.0002, l2 distance: 2194.4385, acc: 1.00.
+2024-10-22 23:57:19,356 - /Users/noesis/Code/group-robust-preference-optimization/experiments/run_glb_noisy.py[line:317] - INFO: True reward parameter: [[2. 2. 2. 2.]
+ [2. 2. 2. 2.]
+ [2. 2. 2. 2.]]
+2024-10-22 23:57:19,357 - /Users/noesis/Code/group-robust-preference-optimization/experiments/run_glb_noisy.py[line:318] - INFO: MLE reward parameter: [620.22118185 720.0685001  648.99839531 539.36401535]
+2024-10-22 23:57:19,576 - /Users/noesis/Code/group-robust-preference-optimization/experiments/run_glb_noisy.py[line:334] - INFO: Learned oracle reward: 2.7737, 2.7737, 2.7737

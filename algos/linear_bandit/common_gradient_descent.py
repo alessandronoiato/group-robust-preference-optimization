@@ -1,11 +1,12 @@
 import copy
 from collections import defaultdict
+import random
 from typing import List, Union
 
 import numpy as np
 import torch as t
 import wandb
-
+t.set_grad_enabled(True)
 from envs.group_linear_bandit import GroupLinearBandit
 from utils.collect_data import GroupTransition
 from utils.logger import Logger
@@ -24,6 +25,7 @@ class CommonGradientDescent:
         reg_coef: float,  ## β scaling in the DPO gradient & loss -- controls KL Divergence from π_ref
         step_size: float,  ## η_θ step size for Gradient Descent on the DPO/IPO loss (if not is_adaptive)
         C: float,  ## Group adjustment hyperparameter, Section 2 of paper
+        ipo_grad_type: str,  ## `justdpo`, `linear` (IPO), 
         num_iters: int,  ## number of update steps on Training dataset
         batch_size: int,  ## batch computation instead of for-loop over each datapoint in D_pref
         logger: Logger = None,  ## logger
@@ -42,6 +44,7 @@ class CommonGradientDescent:
         self.reg_coef = reg_coef
         self.step_size = step_size
         self.C = C
+        self.ipo_grad_type = ipo_grad_type
         self.num_iters = num_iters
         self.batch_size = batch_size
         self.logger = logger
@@ -96,39 +99,91 @@ class CommonGradientDescent:
         return sampled_act
 
     def evaluate_grp_loss(self, dataset: List[GroupTransition]) -> float:
-        loss = t.zeros(self.group_num)
-        counts = t.zeros(self.group_num)
+        if self.ipo_grad_type == "justdpo":
+            loss = t.zeros(self.group_num)
+            counts = t.zeros(self.group_num)
 
-        group_id_idx_all = defaultdict(list)
-        feature_diff_all = t.zeros((len(dataset), self.feature_dim))
+            group_id_idx_all = defaultdict(list)
+            feature_diff_all = t.zeros((len(dataset), self.feature_dim))
 
-        for idx, transition in enumerate(dataset):
-            state, action_one, action_two, group_id, pref = (
-                transition.state,
-                transition.action_0,
-                transition.action_1,
-                transition.group_id,
-                transition.pref,
-            )
-            pref_act = action_two if pref == 1 else action_one
-            non_pref_act = action_two if pref == 0 else action_one
+            for idx, transition in enumerate(dataset):
+                state, action_one, action_two, group_id, pref = (
+                    transition.state,
+                    transition.action_0,
+                    transition.action_1,
+                    transition.group_id,
+                    transition.pref,
+                )
+                pref_act = action_two if pref == 1 else action_one
+                non_pref_act = action_two if pref == 0 else action_one
 
-            feat_pref_act, feat_non_pref_act = (
-                t.tensor(self.feature_func(state, pref_act, group_id), dtype=self.t_float),
-                t.tensor(self.feature_func(state, non_pref_act, group_id), dtype=self.t_float),
-            )
+                feat_pref_act, feat_non_pref_act = (
+                    t.tensor(self.feature_func(state, pref_act, group_id), dtype=self.t_float),
+                    t.tensor(self.feature_func(state, non_pref_act, group_id), dtype=self.t_float),
+                )
 
-            feature_diff_all[idx, :] = feat_pref_act - feat_non_pref_act
+                feature_diff_all[idx, :] = feat_pref_act - feat_non_pref_act
 
-            group_id_idx_all[group_id].append(idx)  # get dataset indices for each group
-            counts[group_id] += 1
+                group_id_idx_all[group_id].append(idx)  # get dataset indices for each group
+                counts[group_id] += 1
 
-        log_ratio_diff = self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
+            log_ratio_diff = self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
 
-        for group_id in range(self.group_num):
-            group_indices = group_id_idx_all[group_id]
-            loss[group_id] = t.sum(-t.log(t.sigmoid(log_ratio_diff[group_indices])))
+            for group_id in range(self.group_num):
+                group_indices = group_id_idx_all[group_id]
+                loss[group_id] = t.sum(-t.log(t.sigmoid(log_ratio_diff[group_indices])))
 
+        
+        elif self.ipo_grad_type == "linear":
+            #if policy is None:
+            #    policy = self.ret_policy()
+
+            loss = t.zeros(self.group_num, dtype=self.t_float)
+            counts = t.zeros(self.group_num, dtype=t.float32)
+
+            group_id_idx_all = {i: [] for i in range(self.group_num)}
+            feature_diff_all = t.zeros((len(dataset), self.feature_dim), dtype=t.float32)
+            pref_act_all = []
+            non_pref_act_all = []
+            #eval_policy_act_prob_all = t.zeros((len(dataset), self.action_num), dtype=t.float32)
+            #ref_policy_act_prob_all = t.zeros((len(dataset), self.action_num), dtype=t.float32)
+
+            for idx, transition in enumerate(dataset):
+                state, action_one, action_two, group_id, pref = (
+                    transition.state,
+                    transition.action_0,
+                    transition.action_1,
+                    transition.group_id,
+                    transition.pref,
+                )
+                pref_act = action_two if pref == 1 else action_one
+                non_pref_act = action_two if pref == 0 else action_one
+
+                #pref_act_all.append(pref_act)
+                #non_pref_act_all.append(non_pref_act)
+
+                feat_pref_act, feat_non_pref_act = (
+                    t.tensor(self.feature_func(state, pref_act, group_id), dtype=t.float32),
+                    t.tensor(self.feature_func(state, non_pref_act, group_id), dtype=t.float32),
+                )
+                feature_diff_all[idx, :] = feat_pref_act - feat_non_pref_act
+
+                group_id_idx_all[group_id].append(idx)
+                counts[group_id] += 1
+            
+            #param = t.tensor(self.param, dtype=t.float32)
+
+            #lin_diff = t.matmul(feature_diff_all, param.unsqueeze(1)) - 0.5 * (1 / self.reg_coef)
+            #coef = lin_diff
+            lin_diff = feature_diff_all @ self.param.reshape(self.feature_dim, 1) - 0.5 * (1 / self.reg_coef)
+            coef = lin_diff
+
+            for group_id in range(self.group_num):
+                group_indices = t.tensor(group_id_idx_all[group_id], dtype=t.long)
+                loss[group_id] = t.sum(t.square(coef[group_indices])) #+ self.adj[group_id] / t.sqrt(self.group_counts[group_id])
+        else:
+            raise ValueError(f"Invalid ipo_grad_type: {self.ipo_grad_type}")
+        
         loss = loss / counts
 
         return loss
@@ -345,10 +400,12 @@ class CommonGradientDescent:
         self.optimizer.zero_grad()
 
         group_losses = self.evaluate_grp_loss(dataset)
+        #group_losses.requires_grad = True
+        print("group_losses:", group_losses)
         all_grads = [
-            t.autograd.grad(group_losses[li], self.param, retain_graph=True)[0] for li in range(self.group_num)
+            t.autograd.grad(group_losses[li], self.param, retain_graph=True, allow_unused=True)[0] for li in range(self.group_num)
         ]
-
+        print("all_grads:", all_grads)
         # Relative Transfer Gain Matrix
         RTG = t.zeros((self.group_num, self.group_num))
         for li in range(self.group_num):
@@ -394,3 +451,4 @@ class CommonGradientDescent:
     @property
     def get_param(self) -> np.ndarray:
         return self.param
+

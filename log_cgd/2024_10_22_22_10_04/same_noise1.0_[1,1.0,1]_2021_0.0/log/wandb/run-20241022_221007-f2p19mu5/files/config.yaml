@@ -1,0 +1,157 @@
+_wandb:
+    value:
+        cli_version: 0.18.2
+        m: []
+        python_version: 3.12.4
+        t:
+            "1":
+                - 1
+                - 55
+            "2":
+                - 1
+                - 55
+            "3":
+                - 13
+                - 15
+                - 16
+                - 19
+                - 23
+                - 55
+            "4": 3.12.4
+            "5": 0.18.2
+            "8":
+                - 5
+            "12": 0.18.2
+            "13": darwin-arm64
+C:
+    value: 0
+action_num:
+    value: 8
+agent:
+    value: pg
+chi:
+    value: 1
+deterministic_ratio_list:
+    value:
+        - 1
+        - 1
+        - 1
+dpo_ada_coef:
+    value: 1
+dpo_adaptive:
+    value: false
+dpo_num_iters:
+    value: 100
+dpo_step_size:
+    value: 0.1
+dpo_type:
+    value: cgd
+env:
+    value: group_linear_bandit
+epsilon:
+    value: 0
+eval_metric:
+    value: argmax
+eval_metric_prob:
+    value: KL
+exp_adaptive:
+    value: 0
+feature_type:
+    value: same
+group_num:
+    value: 3
+importance_sampling:
+    value: false
+importance_sampling_weights:
+    value: None
+ipo_grad_type:
+    value: linear
+l2_reg_rdpo:
+    value: 0
+lamba:
+    value: 0
+log_dir:
+    value: log_cgd/2024_10_22_22_10_04/same_noise1.0_[1,1.0,1]_2021_0.0
+mle_ada_coef:
+    value: 1
+mle_adaptive:
+    value: true
+mle_num_iters:
+    value: 100
+mle_step_size:
+    value: 0.1
+num_trials_for_eval:
+    value: 1000
+param_limit:
+    value: 5
+pref_data_num:
+    value: 300
+rdpo_adj:
+    value: "0"
+rdpo_batch_size:
+    value: 300
+rdpo_exp_step_size:
+    value: 0.1
+rdpo_weighted_batches:
+    value: false
+reg_coef:
+    value: 0.1
+reward_param:
+    value: '[[2.0, 2.0, 2.0, 2.0],[2.0, 2.0, 2.0, 2.0],[2.0, 2.0, 2.0, 2.0]]'
+seed:
+    value: 2021
+state_dim:
+    value: 2
+test_weights:
+    value: '[1,1,1]'
+true_reward_params:
+    value:
+        - - 2
+          - 2
+          - 2
+          - 2
+        - - 2
+          - 2
+          - 2
+          - 2
+        - - 2
+          - 2
+          - 2
+          - 2
+use_closed_form:
+    value: true
+use_theory:
+    value: false
+use_uneven_grp:
+    value: false
+use_uneven_grp_val:
+    value: false
+use_weight_val:
+    value: false
+val_data_num:
+    value: 50
+val_deterministic:
+    value: true
+val_deterministic_ratio_list:
+    value:
+        - 1
+        - 1
+        - 1
+val_weights:
+    value: '[1,1,1]'
+wandb_entity:
+    value: group-robustness-noisy-labels
+wandb_group:
+    value: hp-search
+wandb_key:
+    value: fbf79a31d3c4d52eaf326308d880d3ebca26b10d
+wandb_logdir:
+    value: log_cgd/2024_10_22_22_10_04/same_noise1.0_[1,1.0,1]_2021_0.0/log
+wandb_name:
+    value: cgd,0.1,0.1,0.1,[1,1.0,1],2021
+wandb_project:
+    value: common-good-ipo-even
+wandb_use:
+    value: true
+weights:
+    value: '[1,1,0.4]'
