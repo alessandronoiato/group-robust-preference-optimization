@@ -100,6 +100,7 @@ class CommonGradientDescent:
 
     def evaluate_grp_loss(self, dataset: List[GroupTransition]) -> float:
         if self.ipo_grad_type == "justdpo":
+            print("running cgd with DPO loss")
             loss = t.zeros(self.group_num)
             counts = t.zeros(self.group_num)
 
@@ -135,6 +136,7 @@ class CommonGradientDescent:
 
         
         elif self.ipo_grad_type == "linear":
+            print("running cgd with IPO loss")
             #if policy is None:
             #    policy = self.ret_policy()
 

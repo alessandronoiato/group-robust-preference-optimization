@@ -13,7 +13,7 @@ DPO_NUM_ITERS=100
 # Default values
 VAL_DETERMINISTIC='True'
 STEP_SIZE=0.1 
-REG_COEF=0.1
+REG_COEF=1 # switch back to 0.1 for non-cgd experiments
 DPO_TYPE='cgd'
 EXP_STEP_SIZE=0.1
 WEIGHTED_BATCHES='false'
