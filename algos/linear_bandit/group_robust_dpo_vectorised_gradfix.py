@@ -388,7 +388,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 feature_diff_all @ self.param.reshape(self.feature_dim, 1) - 0.5 * (1 / self.reg_coef)
             )
 
-            coef = np.zeros_like(log_ratio_diff_all)
+            coef = np.zeros_like(linear_diff_all)
 
             for group_id in range(self.group_num):
                 nl = self.noise_level[group_id]
