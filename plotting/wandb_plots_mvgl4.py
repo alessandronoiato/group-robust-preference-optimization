@@ -6,6 +6,7 @@ from scipy.stats import sem
 import neatplot
 import os
 import logging
+import csv
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,7 +14,19 @@ ENTITY = "group-robustness-noisy-labels"
 PROJECT = "common-good-ipo-even"
 SAVE_DIR = "plots/val_grp_loss"
 
-def plot_loss(data, deterministic_ratio, save_path):
+def get_actual_iterations(method, start_iteration, num_points):
+    if method in ['rdpo_with_is', 'rdpo_with_is_none']:
+        return range(start_iteration, start_iteration + num_points * 100, 100)
+    else:  # 'rdpo_without_is' and 'cgd'
+        return range(start_iteration, start_iteration + num_points * 10, 10)
+
+def get_start_index(method, start_iteration):
+    if method in ['rdpo_with_is', 'rdpo_with_is_none']:
+        return (start_iteration // 100) - 1
+    else:  # 'rdpo_without_is' and 'cgd'
+        return (start_iteration // 10) - 1
+
+def plot_loss(data, deterministic_ratio, save_path, start_iteration=100):
     neatplot.set_style()
     
     plt.rcParams['text.usetex'] = False
@@ -28,17 +41,18 @@ def plot_loss(data, deterministic_ratio, save_path):
         'rdpo_with_is': ('IPO', 'blue'),
         'rdpo_without_is': ('GR-IPO', 'orange'),
         'rdpo_with_is_none': ('IS', 'green'),
-        'cgd': ('CGD', 'red')  # Added CGD method
+        'cgd': ('CGD', 'red')
     }
     
     for method, (label, color) in methods.items():
         if method in data and deterministic_ratio in data[method]:
-            mean = data[method][deterministic_ratio]['mean']
-            std_error = data[method][deterministic_ratio]['std_error']
-            iterations = range(1, len(mean) + 1)
+            start_index = get_start_index(method, start_iteration)
+            mean = data[method][deterministic_ratio]['mean'][start_index:]
+            std_error = data[method][deterministic_ratio]['std_error'][start_index:]
+            actual_iterations = get_actual_iterations(method, start_iteration, len(mean))
             
-            plt.plot(iterations, mean, label=label, color=color, linewidth=0.5)
-            plt.fill_between(iterations, mean - std_error, mean + std_error, alpha=0.2, color=color)
+            plt.plot(actual_iterations, mean, label=label, color=color, linewidth=0.5)
+            plt.fill_between(actual_iterations, mean - std_error, mean + std_error, alpha=0.2, color=color)
             
             all_means.extend(mean)
             all_errors.extend(std_error)
@@ -55,13 +69,35 @@ def plot_loss(data, deterministic_ratio, save_path):
             min_val = min(all_means) - max(all_errors)
             max_val = max(all_means) + max(all_errors)
             y_range = max_val - min_val
-            plt.ylim(min_val - 0.9 * y_range, max_val + 0.9 * y_range)
+            plt.ylim(min_val - 0.1 * y_range, max_val + 0.1 * y_range)
         
         neatplot.save_figure(save_path)
         plt.close()
         logging.info(f"Plot saved: {save_path}")
     else:
         logging.warning(f"No data to plot for deterministic ratio: {deterministic_ratio}")
+
+def write_data_to_csv(data, save_dir, start_iteration=100):
+    csv_path = os.path.join(save_dir, 'plot_data.csv')
+    with open(csv_path, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        
+        # Write header
+        header = ['Method', 'Deterministic Ratio', 'Actual Iteration', 'Mean', 'Std Error']
+        writer.writerow(header)
+        
+        for method in data:
+            for det_ratio in data[method]:
+                start_index = get_start_index(method, start_iteration)
+                mean_values = data[method][det_ratio]['mean'][start_index:]
+                std_error_values = data[method][det_ratio]['std_error'][start_index:]
+                actual_iterations = get_actual_iterations(method, start_iteration, len(mean_values))
+                
+                for actual_iteration, mean, std_error in zip(actual_iterations, mean_values, std_error_values):
+                    row = [method, det_ratio, actual_iteration, mean, std_error]
+                    writer.writerow(row)
+    
+    logging.info(f"CSV file with plot data saved: {csv_path}")
 
 # Main execution
 api = wandb.Api()
@@ -139,10 +175,13 @@ for method in data:
 os.makedirs(SAVE_DIR, exist_ok=True)
 logging.info(f"Save directory created: {os.path.abspath(SAVE_DIR)}")
 
+# Write data to CSV
+write_data_to_csv(data, SAVE_DIR, start_iteration=100)
+
 # Create plots
 all_ratios = set(data['rdpo_with_is'].keys()) | set(data['rdpo_without_is'].keys())
 for deterministic_ratio in all_ratios:
     save_path = os.path.join(SAVE_DIR, f'loss_comparison_ratio_{deterministic_ratio}_even.png')
-    plot_loss(data, deterministic_ratio, save_path)
+    plot_loss(data, deterministic_ratio, save_path, start_iteration=100)
 
 logging.info(f"Plotting complete. Plots should be saved in {os.path.abspath(SAVE_DIR)}")

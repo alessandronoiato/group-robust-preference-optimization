@@ -10,7 +10,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 ENTITY = "group-robustness-noisy-labels"
-PROJECT = "cgipo-even-epsilon"
+PROJECT = "common-good-ipo-even"
 # Set the fixed deterministic_ratio
 
 DETERMINISTIC_RATIO = '1,0.3,1'  # Modify this value as needed

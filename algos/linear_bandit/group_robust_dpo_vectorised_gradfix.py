@@ -383,7 +383,20 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 group_loss[group_id] = (((1 - nl) * np.sum(-np.log(sigmoid_pos[group_indices]))) - (nl * np.sum(-np.log(sigmoid_neg[group_indices])))) / (1 - 2*nl) + self.adj[group_id] / np.sqrt(self.group_counts[group_id])
 
                 coef[group_indices] = ((1-nl)*sigmoid_neg[group_indices] + nl*sigmoid_pos[group_indices]) / (1-2*nl)
-           
+        elif self.ipo_grad_type == "noisy_ipo":
+            linear_diff_all = (
+                feature_diff_all @ self.param.reshape(self.feature_dim, 1) - 0.5 * (1 / self.reg_coef)
+            )
+
+            coef = np.zeros_like(log_ratio_diff_all)
+
+            for group_id in range(self.group_num):
+                nl = self.noise_level[group_id]
+                group_indices = group_id_idx_all[group_id]
+
+                group_loss[group_id] = (((1 - nl) * np.sum(np.square(linear_diff_all[group_indices]))) - (nl * np.sum(np.square(linear_diff_all[group_indices])))) / (1 - 2*nl) + self.adj[group_id] / np.sqrt(self.group_counts[group_id])
+
+                coef[group_indices] = ((1-nl)*feature_diff_all[group_indices] + nl*(-feature_diff_all[group_indices])) / (1-2*nl)          
         elif self.ipo_grad_type == "justdpo":
             log_ratio_diff_all = (
                 self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)

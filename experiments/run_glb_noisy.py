@@ -385,7 +385,7 @@ def get_agent(args, logger, feature_dim, feature_func):
             reg_by_group_weights=0,
             lamba=args.lamba,
             chi=args.chi,
-            report_iter=1,
+            report_iter=10,
         )
     elif args.dpo_type == "cgd":
         return CGD(
@@ -404,7 +404,7 @@ def get_agent(args, logger, feature_dim, feature_func):
             logger=logger,
             wandb_use=args.wandb_use,
             param_limit=args.param_limit,
-            report_iter=1,
+            report_iter=10,
             seed=args.seed,
         )
     else:

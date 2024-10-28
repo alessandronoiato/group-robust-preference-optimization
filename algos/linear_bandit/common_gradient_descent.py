@@ -31,7 +31,7 @@ class CommonGradientDescent:
         logger: Logger = None,  ## logger
         wandb_use: bool = False,  ## recording results in WandB
         param_limit: int = 1,  ## elements of vector θ range in [0, param_limit]
-        report_iter: int = 2000,  ## log metrics after these iters
+        report_iter: int = 10,  ## log metrics after these iters
         seed: int = None,  ## Seed
     ) -> None:
         print(f"RUNNING CGD STEP_SIZE={step_size} C={C} REG_COEG={reg_coef} SEED={seed}")
