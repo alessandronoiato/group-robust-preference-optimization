@@ -30,6 +30,7 @@ class CommonGradientDescent:
         batch_size: int,  ## batch computation instead of for-loop over each datapoint in D_pref
         logger: Logger = None,  ## logger
         wandb_use: bool = False,  ## recording results in WandB
+        use_closed_form: bool = False,
         param_limit: int = 1,  ## elements of vector θ range in [0, param_limit]
         report_iter: int = 10,  ## log metrics after these iters
         seed: int = None,  ## Seed
@@ -43,6 +44,7 @@ class CommonGradientDescent:
         self.ref_policy = ref_policy
         self.reg_coef = reg_coef
         self.step_size = step_size
+        self.use_closed_form = use_closed_form
         self.C = C
         self.ipo_grad_type = ipo_grad_type
         self.num_iters = num_iters
@@ -431,12 +433,17 @@ class CommonGradientDescent:
         self.group_weights = self.group_weights / self.group_weights.sum()
         self.group_weights = t.clamp(self.group_weights, min=1e-5)
 
-        # compute objective
-        objective = self.evaluate_grp_loss(sampled_group_transitions)
-        loss = t.sum(objective @ self.group_weights)
-        loss.backward()
+        #insert WeightedRegression here
 
-        self.optimizer.step()
+        # compute objective
+        if self.use_closed_form:
+            self.WeightedRegression(sampled_group_transitions, self.reg_coef)
+        else:
+            objective = self.evaluate_grp_loss(sampled_group_transitions)
+            loss = t.sum(objective @ self.group_weights)
+            loss.backward()
+
+            self.optimizer.step()
 
     def evaluate_reward(self, env: GroupLinearBandit, states: Union[list, None]) -> float:
         policy = self.ret_policy()
@@ -454,3 +461,39 @@ class CommonGradientDescent:
     def get_param(self) -> np.ndarray:
         return self.param
 
+    def WeightedRegression(self, dataset: List[GroupTransition], lamba: float) -> float:
+        """Compute closed-form solution for the optimization problem"""
+        print("WEIGHTED REGRESSION\n\n")
+        Y = []
+        w = []
+        for transition in dataset:
+            state, action_one, action_two, group_id, pref = (
+                transition.state,
+                transition.action_0,
+                transition.action_1,
+                transition.group_id,
+                transition.pref,
+            )
+            pref_act = action_two if pref == 1 else action_one
+            non_pref_act = action_two if pref == 0 else action_one
+            feat_pref_act, feat_non_pref_act = (
+                self.feature_func(state, pref_act, group_id),
+                self.feature_func(state, non_pref_act, group_id),
+            )
+            Y.append(feat_pref_act - feat_non_pref_act)
+            #print(f"self.group_counts within the weighted regression: {self.group_counts}")
+            #print(f"self.group_weights within the weighted regression: {self.group_weights}")
+            w.append((1 - self.chi) / self.group_num + self.chi * self.group_weights[group_id]/self.group_counts[group_id])
+
+        Y = np.array(Y)
+        w = np.array(w)
+        #print("w vector within the weighted regression: ", w)
+        # print(Y.shape,np.diag(w).shape,(Y@self.param).T.shape,((Y@self.param).T-1/(2*self.reg_coef)).dot(Y).shape)
+        coef = np.linalg.inv(Y.transpose() @ np.diag(w) @ Y + lamba * np.eye(Y.shape[1]))
+        # print(np.linalg.det(np.matmul(Y.transpose(),Y)))
+        variate = np.matmul(np.matmul(Y.transpose(), np.diag(w)), np.ones([len(dataset), 1]))
+        self.param = np.matmul(coef, variate).ravel() / (2 * self.reg_coef)
+        live_grad = (np.diag(w).dot((Y @ self.param).T - 1 / (2 * self.reg_coef))).dot(Y) + lamba * self.param
+        print("live_grad within the weighted regression: ", live_grad)
+        print(np.sqrt(np.sum(np.square(live_grad))))
+        return np.sqrt(np.sum(np.square(live_grad)))

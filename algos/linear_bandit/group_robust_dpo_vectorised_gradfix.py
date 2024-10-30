@@ -395,8 +395,8 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 group_indices = group_id_idx_all[group_id]
 
                 group_loss[group_id] = (((1 - nl) * np.sum(np.square(linear_diff_all[group_indices]))) - (nl * np.sum(np.square(linear_diff_all[group_indices])))) / (1 - 2*nl) + self.adj[group_id] / np.sqrt(self.group_counts[group_id])
-
-                coef[group_indices] = ((1-nl)*feature_diff_all[group_indices] + nl*(-feature_diff_all[group_indices])) / (1-2*nl)          
+            #TODO: correct this
+                coef[group_indices] = ((1-nl)*2*linear_diff_all[group_indices] + nl*(-2*linear_diff_all[group_indices])) / (1-2*nl)          
         elif self.ipo_grad_type == "justdpo":
             log_ratio_diff_all = (
                 self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
@@ -805,13 +805,15 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
         Y = np.array(Y)
         w = np.array(w)
-        print("w vector within the weighted regression: ", w)
+        #print("w vector within the weighted regression: ", w)
         # print(Y.shape,np.diag(w).shape,(Y@self.param).T.shape,((Y@self.param).T-1/(2*self.reg_coef)).dot(Y).shape)
         coef = np.linalg.inv(Y.transpose() @ np.diag(w) @ Y + lamba * np.eye(Y.shape[1]))
         # print(np.linalg.det(np.matmul(Y.transpose(),Y)))
         variate = np.matmul(np.matmul(Y.transpose(), np.diag(w)), np.ones([len(dataset), 1]))
         self.param = np.matmul(coef, variate).ravel() / (2 * self.reg_coef)
         live_grad = (np.diag(w).dot((Y @ self.param).T - 1 / (2 * self.reg_coef))).dot(Y) + lamba * self.param
+        print("live_grad within the weighted regression: ", live_grad)
+        print(np.sqrt(np.sum(np.square(live_grad))))
         return np.sqrt(np.sum(np.square(live_grad)))
 
     def evaluate_ipo_loss(self, dataset: List[GroupTransition], policy=None) -> float:
