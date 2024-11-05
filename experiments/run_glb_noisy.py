@@ -394,6 +394,7 @@ def get_agent(args, logger, feature_dim, feature_func):
             group_num=args.group_num,
             feature_dim=feature_dim,
             feature_func=feature_func,
+            use_closed_form=args.use_closed_form,
             ref_policy=ret_uniform_policy_group(args.action_num),
             reg_coef=args.reg_coef,
             ipo_grad_type=args.ipo_grad_type,
@@ -404,6 +405,7 @@ def get_agent(args, logger, feature_dim, feature_func):
             logger=logger,
             wandb_use=args.wandb_use,
             param_limit=args.param_limit,
+            chi=args.chi,
             report_iter=10,
             seed=args.seed,
         )

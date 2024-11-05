@@ -33,6 +33,7 @@ class CommonGradientDescent:
         use_closed_form: bool = False,
         param_limit: int = 1,  ## elements of vector θ range in [0, param_limit]
         report_iter: int = 10,  ## log metrics after these iters
+        chi: float = 1.0,
         seed: int = None,  ## Seed
     ) -> None:
         print(f"RUNNING CGD STEP_SIZE={step_size} C={C} REG_COEG={reg_coef} SEED={seed}")
@@ -54,6 +55,7 @@ class CommonGradientDescent:
         self.param_limit = param_limit
         self.report_iter = report_iter
         self.seed = seed
+        self.chi = chi
 
         if seed is not None:
             t.manual_seed(seed)
@@ -287,11 +289,17 @@ class CommonGradientDescent:
 
     def report_metrics(self, step, dataset, val_dataset, test_dataset, env, optimal_reward):
         with t.no_grad():
-            grad = self.param.grad.clone()
-            grad_norm = t.norm(grad).item()
+            # Replace grad reporting with live_grad from WeightedRegression if using closed form
+            if self.use_closed_form:
+                grad_norm = self.WeightedRegression(dataset, self.reg_coef)
+                grad = None  # No gradient when using closed form
+            else:
+                grad = self.param.grad.clone()
+                grad_norm = t.norm(grad).item()
+            
             live_grad = 0.0
 
-            param = self.param.detach().tolist()
+            param = self.param.detach().tolist() if isinstance(self.param, t.Tensor) else self.param.tolist()
             group_weights = self.group_weights.detach().tolist()
 
             # Calculate losses
@@ -373,9 +381,10 @@ class CommonGradientDescent:
                 for i, loss in enumerate(val_grp_loss):
                     wandb_dict[f"val_group_loss_{i+1}"] = loss
 
-                # Log individual gradient components
-                for i, g in enumerate(grad.tolist()):
-                    wandb_dict[f"grad_{i+1}"] = g
+                # Log individual gradient components only if not using closed form
+                if not self.use_closed_form and grad is not None:
+                    for i, g in enumerate(grad.tolist()):
+                        wandb_dict[f"grad_{i+1}"] = g
 
                 # Log RTG for each group
                 rtg_sum = t.sum(self.RTG, dim=1)
@@ -404,8 +413,6 @@ class CommonGradientDescent:
         self.optimizer.zero_grad()
 
         group_losses = self.evaluate_grp_loss(dataset)
-        #group_losses.requires_grad = True
-        print("group_losses:", group_losses)
         all_grads = [
             t.autograd.grad(group_losses[li], self.param, retain_graph=True, allow_unused=True)[0] for li in range(self.group_num)
         ]
@@ -433,16 +440,13 @@ class CommonGradientDescent:
         self.group_weights = self.group_weights / self.group_weights.sum()
         self.group_weights = t.clamp(self.group_weights, min=1e-5)
 
-        #insert WeightedRegression here
-
-        # compute objective
+        # Now update parameters using weighted regression with the updated weights
         if self.use_closed_form:
-            self.WeightedRegression(sampled_group_transitions, self.reg_coef)
+            grad_norm = self.WeightedRegression(sampled_group_transitions, self.reg_coef)
         else:
             objective = self.evaluate_grp_loss(sampled_group_transitions)
             loss = t.sum(objective @ self.group_weights)
             loss.backward()
-
             self.optimizer.step()
 
     def evaluate_reward(self, env: GroupLinearBandit, states: Union[list, None]) -> float:
@@ -481,19 +485,22 @@ class CommonGradientDescent:
                 self.feature_func(state, non_pref_act, group_id),
             )
             Y.append(feat_pref_act - feat_non_pref_act)
+            print("feat_pref_act: ", feat_pref_act)
             #print(f"self.group_counts within the weighted regression: {self.group_counts}")
             #print(f"self.group_weights within the weighted regression: {self.group_weights}")
-            w.append((1 - self.chi) / self.group_num + self.chi * self.group_weights[group_id]/self.group_counts[group_id])
+            w.append((1 - self.chi) / self.group_num + self.chi * self.group_weights[group_id])#/self.group_counts[group_id])
 
         Y = np.array(Y)
         w = np.array(w)
-        #print("w vector within the weighted regression: ", w)
+        print("w vector within the weighted regression: ", w)
         # print(Y.shape,np.diag(w).shape,(Y@self.param).T.shape,((Y@self.param).T-1/(2*self.reg_coef)).dot(Y).shape)
         coef = np.linalg.inv(Y.transpose() @ np.diag(w) @ Y + lamba * np.eye(Y.shape[1]))
         # print(np.linalg.det(np.matmul(Y.transpose(),Y)))
         variate = np.matmul(np.matmul(Y.transpose(), np.diag(w)), np.ones([len(dataset), 1]))
-        self.param = np.matmul(coef, variate).ravel() / (2 * self.reg_coef)
-        live_grad = (np.diag(w).dot((Y @ self.param).T - 1 / (2 * self.reg_coef))).dot(Y) + lamba * self.param
+        self.param = t.tensor(np.matmul(coef, variate).ravel() / (2 * self.reg_coef), 
+                             dtype=self.t_float, 
+                             requires_grad=True)
+        live_grad = (np.diag(w).dot((Y @ self.param.detach().numpy()).T - 1 / (2 * self.reg_coef))).dot(Y) + lamba * self.param.detach().numpy()
         print("live_grad within the weighted regression: ", live_grad)
         print(np.sqrt(np.sum(np.square(live_grad))))
         return np.sqrt(np.sum(np.square(live_grad)))
