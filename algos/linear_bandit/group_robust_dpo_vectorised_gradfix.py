@@ -45,7 +45,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         l2_reg_rdpo: float = 0,  ## L2 regularisation for vectorised RDPO
         reg_by_group_weights: float = 0,  ## regularisation on vectorised RDPO by subtracting step*group_weights^2
         train_agent: bool = True,  ## if True, use self.train(); else, use self.random_train() func
-        report_iter: int = 10,  ## log metrics after these iters
+        report_iter: int = 20,  ## log metrics after these iters
     ) -> None:
         print(f"{ipo_grad_type=}")
         self.state_dim = state_dim
@@ -399,7 +399,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
                 group_loss[group_id] = (((1 - nl) * np.sum(np.square(linear_diff_all[group_indices]))) - (nl * np.sum(np.square(linear_diff_neg[group_indices])))) / (1 - 2*nl) + self.adj[group_id] / np.sqrt(self.group_counts[group_id])
             #TODO: correct this
-                coef[group_indices] = 2*((1-nl)*linear_diff_all[group_indices] + nl*linear_diff_neg[group_indices]) / ((1-2*nl)*self.reg_coef)          
+                coef[group_indices] = -2*((1-nl)*linear_diff_all[group_indices] + nl*linear_diff_neg[group_indices]) / ((1-2*nl)*self.reg_coef)          
         elif self.ipo_grad_type == "justdpo":
             log_ratio_diff_all = (
                 self.reg_coef * feature_diff_all @ self.param.reshape(self.feature_dim, 1)
@@ -660,6 +660,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
 
         group_id_idx_all = defaultdict(list)
         feature_diff_all = np.zeros((len(dataset), self.feature_dim))
+        feature_diff_neg = np.zeros((len(sampled_group_transitions), self.feature_dim))
         pref_act_all = []
         non_pref_act_all = []
         cur_policy_act_prob_all = np.zeros((len(dataset), self.action_num))
@@ -684,6 +685,7 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                 self.feature_func(state, non_pref_act, group_id),
             )
             feature_diff_all[idx, :] = feat_pref_act - feat_non_pref_act
+            feature_diff_neg[idx, :] = feat_non_pref_act - feat_pref_act
 
             cur_policy_act_prob_all[idx, :] = self.ret_action_prob(state, group_id)
             ref_policy_act_prob_all[idx, :] = self.ref_policy(state, group_id)
@@ -733,6 +735,23 @@ class GroupRobustDirectPolicyOptimizationVectorised:
                     np.square((log_diff[group_indices] - 0.5 * (1 / self.reg_coef)))
                     + self.adj[group_id] / np.sqrt(self.group_counts[group_id])
                 )
+        elif self.ipo_grad_type == "noisy_ipo":
+            linear_diff_all = (
+                feature_diff_all @ self.param.reshape(self.feature_dim, 1) - 0.5 * (1 / self.reg_coef)
+            )
+            linear_diff_neg = (
+                feature_diff_neg @ self.param.reshape(self.feature_dim, 1) - 0.5 * (1 / self.reg_coef)
+            )
+            coef = np.zeros_like(linear_diff_all)
+
+            for group_id in range(self.group_num):
+                nl = self.noise_level[group_id]
+                group_indices = group_id_idx_all[group_id]
+
+                group_loss[group_id] = (((1 - nl) * np.sum(np.square(linear_diff_all[group_indices]))) - (nl * np.sum(np.square(linear_diff_neg[group_indices])))) / (1 - 2*nl) + self.adj[group_id] / np.sqrt(self.group_counts[group_id])
+            #TODO: correct this
+                coef[group_indices] = -2*((1-nl)*linear_diff_all[group_indices] + nl*linear_diff_neg[group_indices]) / ((1-2*nl)*self.reg_coef)          
+
         else:
             raise ValueError("value not implemented")
 
@@ -814,7 +833,11 @@ class GroupRobustDirectPolicyOptimizationVectorised:
         # print(np.linalg.det(np.matmul(Y.transpose(),Y)))
         variate = np.matmul(np.matmul(Y.transpose(), np.diag(w)), np.ones([len(dataset), 1]))
         self.param = np.matmul(coef, variate).ravel() / (2 * self.reg_coef)
-        live_grad = (np.diag(w).dot((Y @ self.param).T - 1 / (2 * self.reg_coef))).dot(Y) + lamba * self.param
+        print("ipo_grad_type: ", self.ipo_grad_type)
+        if self.ipo_grad_type == "noisy_ipo":
+            live_grad = (np.diag(w).dot((Y @ self.param).T - 1 / (2 * self.reg_coef*(1 - 2*self.noise_level[group_id])))).dot(Y) + lamba * self.param
+        else:
+            live_grad = (np.diag(w).dot((Y @ self.param).T - 1 / (2 * self.reg_coef))).dot(Y) + lamba * self.param
         print("live_grad within the weighted regression: ", live_grad)
         print(np.sqrt(np.sum(np.square(live_grad))))
         return np.sqrt(np.sum(np.square(live_grad)))

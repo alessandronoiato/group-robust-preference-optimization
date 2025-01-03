@@ -32,7 +32,7 @@ class CommonGradientDescent:
         wandb_use: bool = False,  ## recording results in WandB
         use_closed_form: bool = False,
         param_limit: int = 1,  ## elements of vector θ range in [0, param_limit]
-        report_iter: int = 10,  ## log metrics after these iters
+        report_iter: int = 20,  ## log metrics after these iters
         chi: float = 1.0,
         seed: int = None,  ## Seed
     ) -> None:
@@ -485,14 +485,14 @@ class CommonGradientDescent:
                 self.feature_func(state, non_pref_act, group_id),
             )
             Y.append(feat_pref_act - feat_non_pref_act)
-            print("feat_pref_act: ", feat_pref_act)
+            #print("feat_pref_act: ", feat_pref_act)
             #print(f"self.group_counts within the weighted regression: {self.group_counts}")
             #print(f"self.group_weights within the weighted regression: {self.group_weights}")
             w.append((1 - self.chi) / self.group_num + self.chi * self.group_weights[group_id])#/self.group_counts[group_id])
 
         Y = np.array(Y)
         w = np.array(w)
-        print("w vector within the weighted regression: ", w)
+        #print("w vector within the weighted regression: ", w)
         # print(Y.shape,np.diag(w).shape,(Y@self.param).T.shape,((Y@self.param).T-1/(2*self.reg_coef)).dot(Y).shape)
         coef = np.linalg.inv(Y.transpose() @ np.diag(w) @ Y + lamba * np.eye(Y.shape[1]))
         # print(np.linalg.det(np.matmul(Y.transpose(),Y)))

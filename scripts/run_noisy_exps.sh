@@ -8,24 +8,24 @@ ACTION_NUM=8
 GROUP_NUM=3
 PREF_DATA_NUM=300
 BATCH_SIZE=300
-DPO_NUM_ITERS=1000
+DPO_NUM_ITERS=2000
 
 # Default values
 VAL_DETERMINISTIC='True'
 STEP_SIZE=0.1 
 REG_COEF=1 
-DPO_TYPE='cgd'
+DPO_TYPE='rdpo'
 EXP_STEP_SIZE=1
 WEIGHTED_BATCHES='false'
 C=0
 EXP_ADAPTIVE=0
 RDPO_ADJ='0'
 EVAL_METRIC='argmax'
-IMPORTANCE_SAMPLING='False'
-IMPORTANCE_SAMPLING_WEIGHTS='None'
+IMPORTANCE_SAMPLING='True'
+IMPORTANCE_SAMPLING_WEIGHTS='0.333,0.333,0.333'
 IPO_GRAD_TYPE='noisy_ipo'
 PARAM_LIMIT=5
-USE_CLOSED_FORM='False'
+USE_CLOSED_FORM='True'
 LAMBA=0
 L2_REG_RDPO=0
 USE_UNEVEN_GRP='False' # 'False'
@@ -35,7 +35,7 @@ WEIGHTS="[1,1,0.4]" # "[1,1,1]"
 VAL_WEIGHTS="[1,1,1]" # "[1,1,1]"
 TEST_WEIGHTS="[1,1,1]" # "[1,1,1]"
 WANDB_ENTITY="group-robustness-noisy-labels"
-WANDB_PROJECT="hp-search"
+WANDB_PROJECT="common-good-ipo2"
 WANDB_GROUP='hp-search'
 CHI=1
 
@@ -43,10 +43,10 @@ CHI=1
 TIMESTAMP=$(date +'%Y_%m_%d_%H_%M_%S')
 
 # Seeds
-SEEDS=(2021) #(2021 2022 2023 2024 2025 2026 2027 2028 2029 2030) 
+SEEDS=(2021 2022 2023 2024 2025 2026 2027 2028 2029 2030) 
 
 # Noise levels (deterministic_ratio_list)
-NOISE_LEVELS=(0.9) #("1.0" "0.9" "0.8" "0.7" "0.6" "0.5" "0.4" "0.3")
+NOISE_LEVELS=("1.0" "0.9" "0.8" "0.7" "0.6" "0.5" "0.4" "0.3")
 
 # Feature types
 FEATURE_TYPES=("same") # ("same" "flipped" "swapped")
